@@ -8,22 +8,10 @@ import sys
 class CircleButton(QtWidgets.QPushButton):
     def __init__(self, radius=None, parent=None):
         super().__init__(parent)
-        if radius is None:
-            radius = self.font().pointSize() * 2
-        self.setRadius(radius)
-
-        # use the palette as source for the colors
-        # palette = self.palette()
-        # light = palette.color(palette.Light)
-        # # midlight = palette.color(palette.Midlight)
-        # mid = palette.color(palette.Mid)
-        # dark = palette.color(palette.Dark)
-
-        # print(light.getRgb())
-        # # print(midlight.getRgb())
-        # print(mid.getRgb())
-        # print(dark.getRgb())
-
+        
+        ### ----- general ----- ###
+        self.set_radius(radius)
+        # Flag to keep track of the button "state" - pneumatic valve open or closed
         self.button_open = False
 
         ### ----- colors ----- ###
@@ -39,14 +27,13 @@ class CircleButton(QtWidgets.QPushButton):
         self.open_color_gradients = self.create_color_gradients(open_light, open_mid, open_dark)
 
         ### ----- movement ----- ###
-        self._mouse_press_pos = None
-        self._mouse_move_pos = None
-        self.button_locked = False
+        self._mouse_press_pos = None # Position of mouse click
+        self._mouse_move_pos = None # Position of mouse movement
+        self.button_locked = False  # Are we allowing the button to move
 
-    
     def create_color_gradients(self, light:QColor, mid:QColor, dark:QColor):
         """A method to create nice gradients between the selected colors to make the button look like
-        a 3D object. Graphic deign go!
+        a 3D object. Graphic deign go brr!
 
         It's not as scary as it looks, but it's still pretty magical. I don't fully know how it works, sourced from 
         https://www.riverbankcomputing.com/pipermail/pyqt/2020-March/042586.html
@@ -97,12 +84,39 @@ class CircleButton(QtWidgets.QPushButton):
         return backgroundUp, backgroundDown, ringShapeUp, ringShapeDown
     
     def change_button_state(self):
+        """Mostly does what it says on the tin. Flips our internal flag that keeps track of the 'state' of the 
+        button - since these correspond to pneumatic valves, the state is either 'open' or 'closed'"""
         if self.button_open == False:
             self.button_open = True
         else:
             self.button_open = False
+
+    def lock_button_movement(self):
+        self.button_locked = True
+
+    def unlock_button_movement(self):
+        self.button_locked = False
+
+    def set_radius(self, radius=None):
+        """Method to set the button radius. If left blank, sets the radius as twice the button font size
+
+        Args:
+            radius (int): Desired radius in px of the button
+        """
+        # If not provided, set the radius as twice the font size
+        if radius is None:
+            radius = self.font().pointSize() * 2
+        # Update the internal variable
+        self.radius = radius
+        # Notify the layout manager that the size hint has changed
+        self.updateGeometry()
     
-    def getButtonRect(self):
+    def get_button_rect(self):
+        """Creates a QRect object based on the internal button size
+
+        Returns:
+            rect: QRect
+        """
         # just a helper function to avoid repetitions
         size = min(self.width(), self.height()) - 1
         rect = QtCore.QRect(0, 0, size, size)
@@ -110,55 +124,74 @@ class CircleButton(QtWidgets.QPushButton):
         return rect
 
     def mousePressEvent(self, event):
-        # ensure that the click happens within the circle
+        """Overwrites the QPushButton mouesPressEvent method with modifications for our circular, movable button"""
+        # Ensure that the click happens within the circle 
         path = QPainterPath()
-        path.addEllipse(QtCore.QRectF(self.getButtonRect()))
+        path.addEllipse(QtCore.QRectF(self.get_button_rect()))
+        # If it does, continue
         if path.contains(event.pos()):
-            # Record the position where we clicked
-            self.__mousePressPos = event.globalPos()
-            self.__mouseMovePos = event.globalPos()
+            # Record the position where we clicked (for movement)
+            self._mouse_press_pos = event.globalPos()
+            self._mouse_move_pos = event.globalPos()
             # Call the parent class method
             super().mousePressEvent(event)
             # Change colors
             self.change_button_state()
 
-    def setRadius(self, radius):
-        self.radius = radius
-        # notify the layout manager that the size hint has changed
-        self.updateGeometry()
-
     def sizeHint(self):
+        """Overwrites the QPushButton sizeHint method to hold the recommended size for the widget"""
         return QtCore.QSize(self.radius, self.radius)
-
+    
     def hasHeightForWidth(self):
+        """Overwrites the QPushButton hasHeightForWidth method. That method normally 
+        returns true if the widget's preferred height depends on its width and otherwise returns false. In our case, only return True
+
+        Returns:
+            True
+        """
         return True
 
     def heightForWidth(self, width):
+        """Overwrites the QPushButton heightForWidth method. Returns the preferred height for this widget, given the width w.
+
+        Args:
+            width (int): width in px
+
+        Returns:
+            width
+        """
         return width
 
     def paintEvent(self, event):
+        """Overwrites the paintEvent method. Renders the circular button"""
         qp = QPainter(self)
         qp.setRenderHints(qp.Antialiasing)
         qp.translate(.5, .5)
         qp.setPen(QtCore.Qt.NoPen)
-        rect = self.getButtonRect()
+        rect = self.get_button_rect()
+        # Render if the button is pressed (based on "backgroundDown" and "ringShapeDown" color gradients)
         if self.isDown() or self.isChecked():
+            # Render yellow if we're in the open state
             if self.button_open:
                 qp.setBrush(self.open_color_gradients[1])
                 qp.drawEllipse(rect)
                 qp.setBrush(self.open_color_gradients[3])
                 qp.drawEllipse(rect)
+            # Otherwise render red if we're in the closed state
             else:
                 qp.setBrush(self.closed_color_gradients[1])
                 qp.drawEllipse(rect)
                 qp.setBrush(self.closed_color_gradients[3])
                 qp.drawEllipse(rect)
+        # Render if the button is not pressed (based on "backgroundUp" and "ringShapeUp" color gradients)
         else:
+            # Render yellow if we're in the open state
             if self.button_open:
                 qp.setBrush(self.open_color_gradients[0])
                 qp.drawEllipse(rect)
                 qp.setBrush(self.open_color_gradients[2])
                 qp.drawEllipse(rect)
+            # Otherwise render red if we're in the closed state
             else:
                 qp.setBrush(self.closed_color_gradients[0])
                 qp.drawEllipse(rect)
@@ -167,29 +200,31 @@ class CircleButton(QtWidgets.QPushButton):
 
 
     def mouseMoveEvent(self, event:QMouseEvent):
+        """Overwrites the QPushButton mouseMoveEvent method. Records the position of the mouse movement, finds the difference
+        between that position and the button, and moves the button
+        """
+        # If we're allowing the button to move...
         if self.button_locked == False:
-            
-            self.setStyleSheet("background-color: lightgrey")
-
-            # adjust offset from clicked point to origin of widget
+            # Adjust offset from clicked point to origin of widget
             currPos = self.mapToGlobal(self.pos())
             globalPos = event.globalPos()
-            diff = globalPos - self.__mouseMovePos
+            diff = globalPos - self._mouse_move_pos
             newPos = self.mapFromGlobal(currPos + diff)
-            # Should constrain the button to the size of the window
-            self.move(newPos)
+            
+            self.move(newPos) #### Should constrain the button to the size of the window
 
-            self.__mouseMovePos = globalPos
+            self._mouse_move_pos = globalPos
 
         # Trigger the original mouseReleaseEvent callback
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event:QMouseEvent):
-        self.setStyleSheet("background-color: lightgrey")
-        moved = event.globalPos() - self.__mousePressPos 
+        """Overwrites the QPushButton mouseReleaseEvent method. Ignores the button click if we've
+        moved the button more than a threshold value"""
+        moved = event.globalPos() - self._mouse_press_pos 
         move_threshold = 3
         if moved.manhattanLength() > move_threshold:
-            self.change_button_state()
+            self.change_button_state() # We didn't trigger a click, so internally change back to its original state
             event.ignore()
         else:
             super().mouseReleaseEvent(event)
