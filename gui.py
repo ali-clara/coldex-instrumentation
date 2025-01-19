@@ -547,8 +547,6 @@ class ApplicationWindow(QWidget):
         label.setText("Pneumatic Grid")
         label.setFont(self.bold16)
         label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        
-        # label.setGeometry(0, 0, 10, 10)
         pneum_grid.addWidget(label)
 
         button = QPushButton(self)

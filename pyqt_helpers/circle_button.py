@@ -1,18 +1,17 @@
-from PyQt5 import QtWidgets, QtCore, sip
+from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
-import sys
-
 class CircleButton(QtWidgets.QPushButton):
-    def __init__(self, radius=None, parent=None):
+    def __init__(self, radius=None, parent=None, ducklings=None):
         super().__init__(parent)
         
         ### ----- general ----- ###
         self.set_radius(radius)
         # Flag to keep track of the button "state" - pneumatic valve open or closed
         self.button_open = False
+        self.ducklings = ducklings
 
         ### ----- colors ----- ###
         closed_light = QColor(247, 217, 126, 255)
@@ -229,13 +228,29 @@ class CircleButton(QtWidgets.QPushButton):
         else:
             super().mouseReleaseEvent(event)
 
+    def moveEvent(self, a0):
+        # print("moved!")
+        if self.ducklings is not None:
+            for child in self.ducklings:
+                # if type(child) == QWidget:
+                print(f"should move child to {self.geometry().center()}")
+                print(f"child at {child.geometry()}")
+
+                child.move(self.geometry().center())
+
+                    # child_size = child.size()
+                    # child.move(self.geometry().getCoords())
+    
+        super().moveEvent(a0)
+
 
 if __name__ == "__main__":
+    import sys
     
     def clicked():
         print("clicked!")
 
-    qapp = QtWidgets.QApplication(sys.argv)
+    qapp = QApplication(sys.argv)
     w = QWidget()
     w.setMinimumSize(100, 100)
 
