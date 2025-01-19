@@ -10,7 +10,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT  as NavigationToolbar
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+# from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -37,6 +37,10 @@ logger.addHandler(fh)
 # Create a formatter to specify our log format
 formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(name)s:  %(message)s", datefmt="%H:%M:%S")
 fh.setFormatter(formatter)
+
+from pyqt_helpers.live_plots import MyFigureCanvas
+from pyqt_helpers.drag_button import DragButton
+from pyqt_helpers.helpers import epoch_to_pacific_time, find_grid_dims
 
 from main_pipeline.sensor import Sensor
 from main_pipeline.interpreter import Interpreter
@@ -78,34 +82,27 @@ class ApplicationWindow(QWidget):
         # Set data buffer parameters
         self.max_buffer_length = 5000 # How long we let the buffers get, helps with memory
         self.default_plot_length = 60 # Length of time (in sec) we plot before you have to scroll back to see it
-        self.load_notes_entries()
         self.init_data_buffer()
         
         # Create the three main GUI panels:
-        # 1. Left panel: sensor status and control
+
+        # 1. Top left panel: sensor status and control
         left_widget = QWidget(self)
         left_widget.setLayout(self.build_control_layout(QGridLayout()))
-        # 2. Center panel: data streaming
-        center_widget = QWidget(self)
-        center_widget.setLayout(self.build_plotting_layout(QVBoxLayout()))
-        # 3. Right panel: logging and notetaking
-        right_widget = QWidget(self)
-        right_widget.setLayout(self.build_notes_layout(QVBoxLayout()))
-        
-        # Wrap these three main panels up into a "splitter" widget, which allows us to resize the panels
-        # by dragging the splitter bar
-        splitter = QSplitter(self)
-        splitter.setOrientation(QtCore.Qt.Horizontal)
-        splitter.setHandleWidth(2)
-        splitter.addWidget(left_widget)
-        splitter.addWidget(center_widget)
-        splitter.addWidget(right_widget)
-        splitter.setChildrenCollapsible(False)
-        splitter.setStyleSheet("QSplitter::handle {background-color: #083054}")
 
-        # Add the splitter to a main layout and add it to the window
-        main_layout = QHBoxLayout()
-        main_layout.addWidget(splitter)
+        # 2. Top right panel: plots
+        right_widget = QWidget(self)
+        right_widget.setLayout(self.build_plotting_layout(QVBoxLayout()))
+
+        # 3. Bottom panel: pneumatic layout
+        bottom_widget = QWidget(self)
+        bottom_widget.setMinimumHeight(int(self.height()/2))
+        bottom_widget.setLayout(self.build_pneumatic_layout(QHBoxLayout()))
+
+        main_layout = QGridLayout()
+        main_layout.addWidget(left_widget, 0, 0)
+        main_layout.addWidget(right_widget, 0, 1)
+        main_layout.addWidget(bottom_widget, 1, 0, 1, 2)
         self.setLayout(main_layout)
         
         # Create a threadpool for this class, so we can do threading later
@@ -130,22 +127,22 @@ class ApplicationWindow(QWidget):
         """
         self.sensor.shutdown_sensors()
     
-    def closeEvent(self, event):
-        """This method overwrites the default QWidget closeEvent that triggers when the window "X" is clicked.
-        It ensures we can shutdown sensors cleanly by opening a QMessageBox to prompt the user to quit/cancel
-        """
-        self.check_close_event()
-        # If we actually want to shut down, shutdown the sensors and then accept the closeEvent
-        if self.accept_quit:
-            self.sensor.shutdown_sensors()
-            try:
-                self.executor.shutdown()
-            except:
-                pass
-            event.accept()
-        # Otherwise, ignore it
-        else:
-            event.ignore()
+    # def closeEvent(self, event):
+    #     """This method overwrites the default QWidget closeEvent that triggers when the window "X" is clicked.
+    #     It ensures we can shutdown sensors cleanly by opening a QMessageBox to prompt the user to quit/cancel
+    #     """
+    #     self.check_close_event()
+    #     # If we actually want to shut down, shutdown the sensors and then accept the closeEvent
+    #     if self.accept_quit:
+    #         self.sensor.shutdown_sensors()
+    #         try:
+    #             self.executor.shutdown()
+    #         except:
+    #             pass
+    #         event.accept()
+    #     # Otherwise, ignore it
+    #     else:
+    #         event.ignore()
 
     def check_close_event(self):
         """Method to check if the user actually wants to quit or not. Opens a QMessageBox and stores
@@ -531,94 +528,59 @@ class ApplicationWindow(QWidget):
 
     ## --------------------- LOGGING & NOTETAKING --------------------- ##
 
-    def build_notes_layout(self, right_layout:QLayout):
-        """Method to build the layout for notetaking.
+    def build_pneumatic_layout(self, bottom_layout:QHBoxLayout):
+        
+        pneum_control_frame = QVBoxLayout()
+        pneum_grid = QGridLayout()
+        pneum_grid_sidebar = QVBoxLayout()
 
-        Args:
-            right_layout (QLayout): Parent layout
-        """
-        right_layout.setContentsMargins(10, 20, 0, 0)
-        # Set the title
+        # left
         label = QLabel(self)
-        label.setText("Notes & Logs")
+        label.setText("Control Method")
         label.setFont(self.bold16)
         label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        right_layout.addWidget(label)
-        # Initialize an empty dictionary of logging entries with keys that correspond to elements in self.notes_dict
-        self.init_logging_entries()
-        # For each entry in self.notes_dict, create a line entry
-        self.lineedits = []
-        for note in self.notes_dict:
-            line = QLineEdit(self)
-            line.setFont(self.norm12)
-            line.setPlaceholderText(note)
-            line.setTextMargins(10, 10, 10, 10)
-            # When the user has finished editing the line, pass the line object and the title to self._save_notes
-            line.editingFinished.connect(partial(self._save_notes, line, note))
-            right_layout.addWidget(line, alignment=Qt.AlignTop)
+        pneum_control_frame.addWidget(label)
 
-        # Make a button that saves the logged entries to a csv when pressed
-        log_button = QPushButton(self)
-        log_button.setText("LOG")
-        log_button.setFont(self.bold12)
-        log_button.pressed.connect(self._log_notes)
-        right_layout.addWidget(log_button, alignment=QtCore.Qt.AlignTop)
 
-        # Position the panel at the top of the window
-        right_layout.setAlignment(QtCore.Qt.AlignTop)
-
-        return right_layout
-
-    def init_logging_entries(self):
-        """Method to build a dictionary to save logged notes
-        """
-        self.logging_entries = {}
-        for key in self.notes_dict:
-            self.logging_entries.update({key:""})
-        self.logging_entries.update({"Internal Timestamp (epoch)":""})
-
-    def _save_notes(self, line:QLineEdit, note_title:str):
-        """Callback function for the QLineEdit entries, holds onto the values entered into the logging panel.
-
-        Args:
-            line (QLineEdit): The line entry in question
-            note_title (str): The title of the note we're saving, must correspond to a key in self.logging_entries
-        """
-        # Add the logging entry to the appropriate key of the dictionary
-        self.logging_entries.update({note_title: line.text()})
-        # Hold onto the QLineEdit object so we can modify it later
-        self.lineedits.append(line)
-
-    def _log_notes(self):
-        """Callback for the 'log' button (self.init_logging_panel), logs the text entries (self.logging_entries) to a csv
-        """
-        # Update the timestamp and save the notes
-        timestamp = time.time()
-        self.logging_entries.update({"Internal Timestamp (epoch)": timestamp})
-        self.writer.save_notes(self.logging_entries.values())
+        # middle
+        label = QLabel(self)
+        label.setText("Pneumatic Grid")
+        label.setFont(self.bold16)
+        label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
         
-        # Clear the notes dictionary
-        for key in self.logging_entries:
-            self.logging_entries[key] = ""
-        # Clear the text entries on the GUI
-        for line in self.lineedits:
-            line.clear()
-   
-    def load_notes_entries(self):
-        """
-        Method to read in the log_entries.yaml config file and grab onto that dictionary. If it can't
-        find that file, it returns an empty dictionary - no logging entries will be displayed.
+        # label.setGeometry(0, 0, 10, 10)
+        pneum_grid.addWidget(label)
+
+        button = QPushButton(self)
+        button.setStyleSheet("border-radius : 50; border : 2px solid black")
+        button.setMaximumWidth(50)
+        button.setText("test")
+        pneum_grid.addWidget(button)
         
-        Updates - 
-            - self.notes_dict: dict, entries to display on the logging panel
-        """
-        # Read in the logging config file to initialize the notes entries 
-        try:
-            with open("config/log_entries.yaml", 'r') as stream:
-                self.notes_dict = yaml.safe_load(stream)
-        except FileNotFoundError as e:
-            logger.warning(f"Error in reading log_entries config file: {e}. Leaving logging panel empty.")
-            self.notes_dict = {}
+        # right
+        button = QPushButton(self)
+        button.setText("Lock button position")
+        button.setFont(self.norm12)
+        pneum_grid_sidebar.addWidget(button)
+
+        button = QPushButton(self)
+        button.setText("Save button positions")
+        button.setFont(self.norm12)
+        pneum_grid_sidebar.addWidget(button)
+
+
+        bottom_layout.addLayout(pneum_control_frame)
+        bottom_layout.addLayout(pneum_grid)
+        bottom_layout.addLayout(pneum_grid_sidebar)
+
+
+        return bottom_layout
+
+    def make_pneumatic_button_grid(self, parent):
+        pass
+
+        
+        
     
     ## --------------------- DATA STREAMING / LIVE PLOTTING --------------------- ##
 
@@ -1036,72 +998,6 @@ class AnotherWindow(QWidget):
         """
         self.my_layout.addWidget(widget)
 
-## --------------------- PLOTTING --------------------- ##
-class MyFigureCanvas(FigureCanvas):
-    """This is the FigureCanvas in which a live plot is drawn."""
-    def __init__(self, x_init:deque, y_init:deque, xlabels:list, ylabels:list, num_subplots=1, x_range=60, axis_titles=None) -> None:
-        """
-        :param x_init:          Initial x-data
-        :param y_init:          Initial y-data
-        :param x_range:         How much data we show on the x-axis, in x-axis units
-
-        """
-        super().__init__(plt.Figure())
-
-        # Initialize constructor arguments
-        self.x_data = x_init
-        self.y_data = y_init
-        self.x_range = x_range
-        self.num_subplots = num_subplots
-
-        # Generate and store a figure axis for the number of subplots passed in
-        self.axs = []
-        for i in range(0, num_subplots):
-            ax = self.figure.add_subplot(num_subplots+1, 1, i+1)
-            ax.plot(x_init[i], y_init[i], '.--')
-            self.axs.append(ax)
-            ax.set_xlabel(xlabels[i])
-            ax.set_ylabel(ylabels[i])
-            if axis_titles is not None:
-                ax.set_title(axis_titles[i])
-
-        # Set a figure size
-        self.figure.set_figheight(5*num_subplots)
-        self.figure.tight_layout(h_pad=5)
-        
-        self.draw()   
-
-    def update_data(self, x_new=None, y_new=None):
-        """Method to update the variables to plot. If nothing is given, doesn't update data - safety catch in case something has gone wrong with the GUI"""    
-        if x_new is None:
-            pass
-        else:
-            self.x_data = x_new
-
-        if y_new is None:
-            pass
-        else:
-            self.y_data = y_new
-
-    def update_canvas(self) -> None:
-        """Method to update the plots based on the buffers stored in self.x_data and self.y_data"""
-        # Loop through the number of subplots in this figure
-        for i, ax in enumerate(self.axs):
-            # Clear the figure without resetting the axis bounds or ticks
-            for artist in ax.lines:
-                artist.remove()
-            # Plot the updated data
-            ax.plot(self.x_data[i], self.y_data[i], '.--')
-            # Make sure we aren't either plotting offscreen or letting the x axis get too long
-            # We can't do math directly with Timestamp objects, so do the math in epoch time and then convert
-            current_time = time.time()
-            desired_x_min = current_time - self.x_range
-            current_time_datetime, _ = epoch_to_pacific_time(current_time)
-            x_min_datetime, _ = epoch_to_pacific_time(desired_x_min)
-            # Set the limits
-            ax.set_xlim([x_min_datetime, current_time_datetime])
-        # Finally, update the plot
-        self.draw()
 
 ## --------------------- PYQT THREADING --------------------- ##
 class WorkerSignals(QObject):
@@ -1155,69 +1051,6 @@ class Worker(QRunnable):
             self.signals.result.emit(result)  # Return the result of the processing
         finally:
             self.signals.finished.emit() # Done
-
-
-###################################### HELPER FUNCTIONS ######################################
-
-def find_grid_dims(num_elements, num_cols):
-    """Method to determine the number of rows we need in a grid given the number of elements and the number of columns
-
-    Args:
-        num_elements (int): How many elements we want to split
-        num_cols (int): How many columns across which we want to split them
-
-    Returns:
-        num_rows (int): Number of rows needed in the grid
-        
-        **num_cols**: *int*  Number of columns needed in the grid
-    """    
-
-    num_rows = num_elements / num_cols
-    # If the last number of the fraction is a 5, add 0.1. This is necessary because Python defaults to 
-    # "bankers rounding" (rounds 2.5 down to 2, for example) so would otherwise give us too few rows
-    if str(num_rows).split('.')[-1] == '5':
-        num_rows += 0.1
-    num_rows = round(num_rows)
-
-    return num_rows, num_cols
-
-def epoch_to_pacific_time(time, y_data=None):
-    """Method to convert from epoch (UTC, number of seconds since Jan 1, 1970) to a datetime format
-    in the Pacific timezone. Can also take in an accompanying array of y_data to ensure any changes in shape
-    that happen to the time (like removing np.nan values) also happens to the y_data.
-
-    Args:
-        time (array_like): Anything that can be converted into a np array and sliced, e.g a list of epoch times
-        y_data (array_like): Can be an array of values or an array of arrays, either works
-
-    Returns:
-        t_pacific (DateTimeIndex): Datetime object in pacific time
-    """
-    # Convert to numpy array
-    time = np.array(time)
-    # Get rid of any np.nan present in t, it messes with the conversion
-    nan_mask = np.invert(np.isnan(time))
-    time = time[nan_mask]
-    # If we've passed in y_data, apply the same mask to keep the arrays matching
-    if y_data is not None:        
-        # See if the first value of y_data has a length. If it does (no error), y_data is a list of lists.
-        # If it throws a TypeError, it's a list of values
-        try:
-            len(y_data[0])
-        # If y_data is an array of values, apply the mask directly
-        except TypeError:
-            y_data = np.array(y_data)[nan_mask]
-        # If y_data is an array of arrays, apply the mask to each sub-array
-        else:
-            y_data = [np.array(y)[nan_mask] for y in y_data]
-    # Convert t to datetime, specifying that it's in seconds
-    t_datetime = pd.to_datetime(time, unit='s')
-    # Current timezone is UTC
-    t_utc = t_datetime.tz_localize('utc')
-    # New timezone is pacific
-    t_pacific = t_utc.tz_convert('America/Los_Angeles')
-
-    return t_pacific, y_data
 
 
 # If we're running from this script, spin up QApplication and start the GUI
