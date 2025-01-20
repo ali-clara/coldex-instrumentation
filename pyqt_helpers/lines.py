@@ -4,8 +4,7 @@ class HLine(QFrame):
     """A horizontal line"""
     def __init__(self):
         super().__init__()
-        self.setMinimumWidth(1)
-        # self.setFixedHeight(20)
+        self.setMinimumWidth(10)
         self.setFrameShape(QFrame.HLine)
         self.setFrameShadow(QFrame.Sunken)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
@@ -15,43 +14,37 @@ class VLine(QFrame):
     """A vertical line"""
     def __init__(self, ducklings=None):
         super().__init__()
-        # self.setFixedWidth(20)
-        self.setMinimumHeight(1)
+        self.setMinimumWidth(20)
         self.setFrameShape(QFrame.VLine)
-        self.setFrameShadow(QFrame.Sunken)
         self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
-
-
-    # def setGeometry(self, ax, ay, wx, wy):
-    #     if self.reference is not None:
-    #         reference_coords = self.reference.geometry().getCoords()
-    #         print(reference_coords)
-
-    #     super().setGeometry(ax, ay, wx, wy)
-
-    
 
         
 if __name__ == "__main__":
     import sys
     from circle_button import CircleButton
+    import yaml
+
+    with open("config/button_locs.yaml", "r") as stream:
+        button_locs = yaml.load(stream)
 
     app = QApplication(sys.argv)
     widget = QWidget()
 
     separator_vertical = VLine()
     separator_vertical.setParent(widget)
-    separator_vertical.setGeometry(500, 70, 4, 40)
-    # # separator_vertical.setGeometry(button.x(), button.y(), 2, 30)
+    separator_vertical.setGeometry(500, 70, 4, 60)
 
     button = CircleButton(50, widget, ducklings=[separator_vertical])
     button.setParent(widget)
-    button.setGeometry(10, 10, 50, 50)
+    button.move(button_locs["button 1"]["x"], button_locs["button 1"]["y"])
     print(button.geometry().center())
 
-    # separator_horizontal = HLine()
-    # separator_horizontal.setParent(widget)
-    # separator_horizontal.setGeometry(200, 40, 20, 2)
-
     widget.show()
-    sys.exit(app.exec())
+    app.exec()
+
+    button_loc_dic = {}
+    button_loc_dic.update({"button 1": {"x":button.geometry().center().x(), "y":button.geometry().center().y()}})
+    print(button_loc_dic)
+    with open("config/button_locs.yaml", "w") as yaml_file:
+        dump = yaml.safe_dump(button_loc_dic)
+        yaml_file.write(dump)

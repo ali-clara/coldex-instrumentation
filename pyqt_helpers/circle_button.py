@@ -2,9 +2,12 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+import numpy as np
+
+from lines import VLine, HLine
 
 class CircleButton(QtWidgets.QPushButton):
-    def __init__(self, radius=None, parent=None, ducklings=None):
+    def __init__(self, radius=None, parent=None, ducklings=[]):
         super().__init__(parent)
         
         ### ----- general ----- ###
@@ -29,6 +32,18 @@ class CircleButton(QtWidgets.QPushButton):
         self._mouse_press_pos = None # Position of mouse click
         self._mouse_move_pos = None # Position of mouse movement
         self.button_locked = False  # Are we allowing the button to move
+
+        self.child_baselines = []
+        for child in ducklings:
+            try:
+                child.geometry()
+            except AttributeError:
+                baseline = np.nan
+            else:
+                baseline = child.geometry().bottom()
+
+            self.child_baselines.append(baseline)
+
 
     def create_color_gradients(self, light:QColor, mid:QColor, dark:QColor):
         """A method to create nice gradients between the selected colors to make the button look like
@@ -228,25 +243,32 @@ class CircleButton(QtWidgets.QPushButton):
         else:
             super().mouseReleaseEvent(event)
 
-    def moveEvent(self, a0):
-        # print("moved!")
-        if self.ducklings is not None:
-            for child in self.ducklings:
-                # if type(child) == QWidget:
-                print(f"should move child to {self.geometry().center()}")
-                print(f"child at {child.geometry()}")
-
-                child.move(self.geometry().center())
-
-                    # child_size = child.size()
-                    # child.move(self.geometry().getCoords())
     
+    def moveEvent(self, a0):
+        print(self.geometry().center())
+        if self.ducklings is not None:
+            for i, child in enumerate(self.ducklings):
+                child_width = child.geometry().width()
+                # Create a new geometry for the child object
+                new_geo = QRect()
+                new_geo.setLeft(self.geometry().center().x() - int(child_width/2))
+                new_geo.setRight(self.geometry().center().x() + int(child_width/2))
+                if child.geometry().bottom() > self.geometry().center().y():
+                    new_geo.setTop(self.geometry().center().y())
+                    new_geo.setBottom(self.child_baselines[i])
+                else:
+                    new_geo.setBottom(self.geometry().center().y())
+                    new_geo.setTop(self.child_baselines[i])
+
+                child.setGeometry(new_geo)
+                    
+
         super().moveEvent(a0)
 
 
 if __name__ == "__main__":
     import sys
-    
+
     def clicked():
         print("clicked!")
 
