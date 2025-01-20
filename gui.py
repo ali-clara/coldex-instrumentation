@@ -39,7 +39,8 @@ formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(name)s:  %(message
 fh.setFormatter(formatter)
 
 from pyqt_helpers.live_plots import MyFigureCanvas
-from pyqt_helpers.drag_button import DragButton
+from pyqt_helpers.circle_button import CircleButton
+from pyqt_helpers.lines import VLine
 from pyqt_helpers.helpers import epoch_to_pacific_time, find_grid_dims
 
 from main_pipeline.sensor import Sensor
@@ -95,9 +96,12 @@ class ApplicationWindow(QWidget):
         right_widget.setLayout(self.build_plotting_layout(QVBoxLayout()))
 
         # 3. Bottom panel: pneumatic layout
+        self.pneumatic_grid_buttons = []
+        self.pneumatic_autonomous_controls = []
         bottom_widget = QWidget(self)
         bottom_widget.setMinimumHeight(int(self.height()/2))
         bottom_widget.setLayout(self.build_pneumatic_layout(QHBoxLayout()))
+        
 
         main_layout = QGridLayout()
         main_layout.addWidget(left_widget, 0, 0)
@@ -161,6 +165,14 @@ class ApplicationWindow(QWidget):
             self.accept_quit = True
         elif msg_return == QMessageBox.Cancel:
             self.accept_quit = False
+
+    ## --------------------- HELPERS --------------------- ## 
+    def _make_default_label(self, text, font):
+        label = QLabel(self)
+        label.setText(text)
+        label.setFont(font)
+        label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
+        return label
 
     ## --------------------- SENSOR STATUS & CONTROL --------------------- ## 
        
@@ -526,59 +538,181 @@ class ApplicationWindow(QWidget):
             status.setText(text)
             status.setStyleSheet(f"background-color:{color}; margin:10px")
 
-    ## --------------------- LOGGING & NOTETAKING --------------------- ##
+    ## --------------------- PNEUMATIC GRID --------------------- ##
 
     def build_pneumatic_layout(self, bottom_layout:QHBoxLayout):
         
-        pneum_control_frame = QVBoxLayout()
+        pneum_control_frame = self.make_pneumatic_control()
         pneum_grid = QGridLayout()
         pneum_grid_sidebar = QVBoxLayout()
 
-        # left
-        label = QLabel(self)
-        label.setText("Control Method")
-        label.setFont(self.bold16)
-        label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        pneum_control_frame.addWidget(label)
-
-
         # middle
-        label = QLabel(self)
-        label.setText("Pneumatic Grid")
-        label.setFont(self.bold16)
-        label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        pneum_grid.addWidget(label)
+        line = QFrame(self)
+        line.setFrameShape(QFrame.VLine)
+        pneum_grid.addWidget(line, 0, 0, 2, 1)
 
-        button = QPushButton(self)
-        button.setStyleSheet("border-radius : 50; border : 2px solid black")
-        button.setMaximumWidth(50)
-        button.setText("test")
-        pneum_grid.addWidget(button)
+        label = self._make_default_label("Pneumatic Grid", self.bold16)
+        pneum_grid.addWidget(label, 0, 1)
+                             
+        pneum_widget = self.make_pneumatic_button_grid()
+        pneum_grid.addWidget(pneum_widget, 1, 1)
+
+        line = QFrame(self)
+        line.setFrameShape(QFrame.VLine)
+        pneum_grid.addWidget(line, 0, 2, 2, 1)
         
         # right
         button = QPushButton(self)
-        button.setText("Lock button position")
+        button.setText("Unlock Button Positions")
         button.setFont(self.norm12)
+        button.setMinimumWidth(int(self.width()*0.15))
+        button.clicked.connect(partial(self._control_pneumatic_button_movement, button))
         pneum_grid_sidebar.addWidget(button)
 
         button = QPushButton(self)
         button.setText("Save button positions")
         button.setFont(self.norm12)
+        button.clicked.connect(self._save_pneumatic_button_positions)
         pneum_grid_sidebar.addWidget(button)
 
+        pneum_grid_sidebar.setAlignment(QtCore.Qt.AlignCenter)
 
         bottom_layout.addLayout(pneum_control_frame)
         bottom_layout.addLayout(pneum_grid)
         bottom_layout.addLayout(pneum_grid_sidebar)
 
-
         return bottom_layout
+    
+    def make_pneumatic_control(self):
+        pneum_control_frame = QVBoxLayout()
 
-    def make_pneumatic_button_grid(self, parent):
-        pass
+        label = self._make_default_label("Control Method", self.bold16)
+        pneum_control_frame.addWidget(label)
 
+        label = self._make_default_label("Manual Valve Controls", self.norm12)
+        pneum_control_frame.addWidget(label)
+
+        button = QPushButton(self)
+        button.setCheckable(True)
+        button.setStyleSheet("background-color : green")
+        button.setFixedWidth(int(label.width() * 1.5))
         
+        button.clicked.connect(partial(self._on_manual_valve_control, button))
+        pneum_control_frame.addWidget(button, alignment=QtCore.Qt.AlignHCenter)
+
+        line = QFrame(self)
+        line.setFrameShape(QFrame.HLine)
+        pneum_control_frame.addWidget(line)
+
+        label = self._make_default_label("Automation Routine", self.norm12)
+        pneum_control_frame.addWidget(label)
+
+        dropdown = QComboBox()
+        dropdown.addItems(['One', 'Two', 'Three', 'Four']) # Replace with automation routines
+        dropdown.setDisabled(True)
+        self.pneumatic_autonomous_controls.append(dropdown)
+        pneum_control_frame.addWidget(dropdown)
+
+        line = QFrame(self)
+        line.setFrameShape(QFrame.HLine)
+        pneum_control_frame.addWidget(line)
+
+        buttons_layout = QHBoxLayout()
+
+        button = QPushButton()
+        button.setIcon(QIcon("doc/imgs/play.png"))
+        button.clicked.connect(partial(self._on_start_autonomous, dropdown))
+        button.setDisabled(True)
+        self.pneumatic_autonomous_controls.append(button)
+        buttons_layout.addWidget(button) 
+
+        button = QPushButton()
+        button.setIcon(QIcon("doc/imgs/pause.png"))
+        button.clicked.connect(partial(self._on_pause_autonomous, dropdown))
+        button.setDisabled(True)
+        self.pneumatic_autonomous_controls.append(button)
+        buttons_layout.addWidget(button) 
+
+        button = QPushButton()
+        button.setIcon(QIcon("doc/imgs/stop.png"))
+        button.clicked.connect(partial(self._on_stop_autonomous, dropdown))
+        button.setDisabled(True)
+        self.pneumatic_autonomous_controls.append(button)
+        buttons_layout.addWidget(button) 
+
+        pneum_control_frame.addLayout(buttons_layout)
+
+        # Position the widgets at the top of the layout
+        pneum_control_frame.setAlignment(QtCore.Qt.AlignTop)
+
+        return pneum_control_frame
+
+
+    def make_pneumatic_button_grid(self):
+        parent_widget = QWidget()
+        parent_widget.setMinimumHeight(int(self.height()/2.25))
+        parent_widget.setMinimumWidth(int(self.width()*0.6))
+
+        def yey():
+            print("clicked")
+
+        button = CircleButton(radius=50, parent=parent_widget)
+        self.pneumatic_grid_buttons.append(button)
+        button.clicked.connect(yey)
         
+        return parent_widget
+    
+    def _on_manual_valve_control(self, button:QPushButton):
+        # If button is checked
+        if button.isChecked():
+            button.setStyleSheet("background-color : grey")
+            for pneumatic_button in self.pneumatic_grid_buttons:
+                pneumatic_button.setDisabled(True)
+            for control in self.pneumatic_autonomous_controls:
+                control.setEnabled(True)
+            # button.setText("Click for manual valve controls")
+            # label.setText("Valve Controls: Autonomous")
+        # If button is unchecked
+        else:
+            button.setStyleSheet("background-color : green")
+            for pneumatic_button in self.pneumatic_grid_buttons:
+                pneumatic_button.setEnabled(True)
+            for control in self.pneumatic_autonomous_controls:
+                control.setDisabled(True)
+            # button.setText("Click for autonomous valve controls")
+            # label.setText("Valve Controls: Manual")
+
+    def _on_start_autonomous(self, routine_select:QComboBox):
+        routine_name = routine_select.currentText()
+        print(f"start autonomous mode: {routine_name}")
+
+    def _on_pause_autonomous(self, routine_select:QComboBox):
+        routine_name = routine_select.currentText()
+        print(f"pause autonomous mode: {routine_name}")
+
+    def _on_stop_autonomous(self, routine_select:QComboBox):
+        routine_name = routine_select.currentText()
+        print(f"stop autonomous mode: {routine_name}")
+
+    def _control_pneumatic_button_movement(self, control_button:QPushButton):
+        if self.pneumatic_grid_buttons[0].button_locked:
+            for pneumatic_button in self.pneumatic_grid_buttons:
+                pneumatic_button.unlock_button_movement()
+                control_button.setText("Lock Button Positions")
+        else:
+            for pneumatic_button in self.pneumatic_grid_buttons:
+                pneumatic_button.lock_button_movement()
+                control_button.setText("Unlock Button Positions")
+
+    def _save_pneumatic_button_positions(self):
+        for i, pneumatic_button in enumerate(self.pneumatic_grid_buttons):
+            button_loc_dic = {}
+            button_loc_dic.update({f"button {i}": {"x":pneumatic_button.geometry().center().x(), 
+                                                "y":pneumatic_button.geometry().center().y()}})
+            with open("config/button_locs.yaml", "w") as yaml_file:
+                dump = yaml.safe_dump(button_loc_dic)
+                yaml_file.write(dump)
+            
     
     ## --------------------- DATA STREAMING / LIVE PLOTTING --------------------- ##
 
@@ -635,72 +769,11 @@ class ApplicationWindow(QWidget):
             self.plot_tab.addTab(tab, sensor)
             # Hold onto the figure object for later
             self.plot_figs.update({sensor: fig})
-        # Finally, add a custom tab to plot multiple readings from multiple sensors
-        self.add_main_plots_tab()
         # Once we've done all that, add the QTabWidget to the main layout
         center_layout.addWidget(self.plot_tab)
 
         return center_layout
 
-    def add_main_plots_tab(self):
-        """Method to build a unique tab to show a specified set of sensor channels on the main page. Sensors to show here are set in 
-        main_page_plots.yaml
-        """
-        # Create a new tab and give it a vertical layout
-        tab = QWidget(self)
-        tab.setObjectName("All")
-        tab_vbox = QVBoxLayout(tab)
-        # Read in the plots we want on the main page
-        y_axis_labels, num_subplots = self.load_main_page_plot_dict()
-        # Make a figure and toolbar for the main page and put them in the tab
-        fig = MyFigureCanvas(x_init=[[np.nan]]*num_subplots,   # List of lists, one for each subplot, to initialize the figure x-data
-                                 y_init=[[np.nan]]*num_subplots, # List of lists, one for each subplot, to initialize the figure y-data
-                                 xlabels=["Time"]*num_subplots,
-                                 ylabels=y_axis_labels,
-                                 num_subplots=num_subplots,
-                                 x_range=self.default_plot_length, # Set xlimit range of each axis
-                                 axis_titles=list(self.main_page_plots.keys())
-                                 )
-        toolbar = NavigationToolbar(fig, self, coordinates=False)
-        tab_vbox.addWidget(toolbar, alignment=Qt.AlignHCenter)
-        tab_vbox.addWidget(fig)
-        # Add the figure to the stored dictionary of data streaming figures
-        self.plot_figs.update({"All":fig})
-        # Add the tab to the QTabWidget
-        self.plot_tab.insertTab(0, tab, "Specified Plots")
-        # Set the current index so this tab is visible when the GUI opens. Also set the font
-        self.plot_tab.setCurrentIndex(0)
-        self.plot_tab.setFont(self.norm10)
-
-    def load_main_page_plot_dict(self):
-        """Method to read and parse the main_page_plots.yaml config file
-
-        Returns:
-            y_axis_labels (list): List of axis labels for the main page subplots
-
-            **num_subplots**: *int* Number of needed main page subplots
-        """
-        # If we can find it, read in the main page configuration yaml file. This loads a dictionary with the names of sensors and channels
-        # we want to put on the main page. It has key-value pairs of {"sensor name":{["channel name", "other channel name"]}, ...}
-        try:
-            with open("config/main_page_plots.yaml", 'r') as stream:
-                self.main_page_plots = yaml.safe_load(stream)
-        # If we can't find it, note that
-        except FileNotFoundError:
-            logger.warning("Error in reading the main_page_plots configuration file. Check your directories.")
-            self.main_page_plots = {}
-
-        # Parse through the dictionary to extract the data channels we want to plot
-        num_subplots = 0 # and keep an eye on how many subplots we need to initialize
-        y_axis_labels = []
-        for sensor in self.main_page_plots:
-            if sensor in self.sensor_names:
-                main_page_plot_channels = self.main_page_plots[sensor]
-                for channel in main_page_plot_channels:
-                    y_axis_labels.append(channel)
-                    num_subplots += 1
-
-        return y_axis_labels, num_subplots
 
     def _thread_plots(self):
         """Method to update the live plots with the buffers stored in self.big_data_dict
@@ -748,30 +821,12 @@ class ApplicationWindow(QWidget):
             # All sensor channels have the same timestamp, so make n_subplots copies of the time
             x_data_list = [t_pacific_time]*num_subplots 
             
-        # If we can't find it in the buffer, we're probably on the "main page plots" tab, in which case the plot name is "All"
+        # If we can't find it in the buffer (and we should never get here since all dict keys are passed in externally), 
+        # something went wrong. The plots safely don't update if we pass in None, so do that
         except KeyError as e:
-            # If we /are/ on that page, we need to do a little more finagling to extract the data we want
-            if plot_name == "All":
-                # Grab the sensors we want to plot, from the dictionary we read in earlier (add_all_plots_page)
-                sensors = list(self.main_page_plots.keys())
-                # The dictionary has key-value pairs of "sensor name":["sensor channel to plot", "other sensor channel to plot"].
-                # Loop through both the sensor names /and/ the sensor channels we want to plot, grabbing their data from the big dict
-                x_data_list = []
-                y_data_list = []
-                for sensor in sensors:
-                    subplot_names = self.main_page_plots[sensor]
-                    for subplot_name in subplot_names:
-                        # Convert from UTC epoch time to pacific time
-                        t, y = epoch_to_pacific_time(time = self.big_data_dict[sensor]["Time (epoch)"], 
-                                                             y_data = self.big_data_dict[sensor]["Data"][subplot_name])
-                        x_data_list.append(t)
-                        y_data_list.append(y)
-            # Otherwise (and we should never get here since all dict keys are passed in externally), something went wrong. 
-            # The plots safely don't update if we pass in None, so do that
-            else:
-                logger.error(f"Error in reading the data buffer when updating plots: {e}")
-                x_data_list = None
-                y_data_list = None
+            logger.error(f"Error in reading the data buffer when updating plots: {e}")
+            x_data_list = None
+            y_data_list = None
 
         return x_data_list, y_data_list
 

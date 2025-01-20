@@ -51,7 +51,7 @@ if __name__ == "__main__":
     print(widget.geometry().size())
 
     button = CircleButton(50, widget, ducklings=[separator_vertical])
-    button.move(QPoint(button_locs["button 1"]["x"], button_locs["button 1"]["y"]))
+    button.move(button_locs["button 1"]["x"], button_locs["button 1"]["y"])
     print(button.geometry().center())
 
     widget.show()

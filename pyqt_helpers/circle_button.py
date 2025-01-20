@@ -4,9 +4,12 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import numpy as np
 
-from lines import VLine, HLine
+try:
+    from lines import VLine, HLine
+except ModuleNotFoundError:
+    from pyqt_helpers.lines import VLine, HLine
 
-class CircleButton(QtWidgets.QPushButton):
+class CircleButton(QPushButton):
     def __init__(self, radius=None, parent=None, ducklings=[]):
         super().__init__(parent)
         
@@ -27,23 +30,14 @@ class CircleButton(QtWidgets.QPushButton):
 
         self.closed_color_gradients = self.create_color_gradients(closed_light, closed_mid, closed_dark)
         self.open_color_gradients = self.create_color_gradients(open_light, open_mid, open_dark)
+        self.disabled_color_gradients = self.create_color_gradients(self.palette().color(self.palette().Light),
+                                                                    self.palette().color(self.palette().Midlight),
+                                                                    self.palette().color(self.palette().Dark))
 
         ### ----- movement ----- ###
-        self._mouse_press_pos = None # Position of mouse click
-        self._mouse_move_pos = None # Position of mouse movement
-        self.button_locked = False  # Are we allowing the button to move
-
-        # self.child_baselines = []
-        # for child in ducklings:
-        #     try:
-        #         child.geometry()
-        #     except AttributeError:
-        #         baseline = np.nan
-        #     else:
-        #         baseline = child.geometry().bottom()
-
-        #     self.child_baselines.append(baseline)
-
+        self._mouse_press_pos = self.geometry().center() # Position of mouse click, initialized to reasonable QPoint
+        self._mouse_move_pos = self.geometry().center() # Position of mouse movement, initialized to reasonable QPoint
+        self.button_locked = True  # Are we allowing the button to move
 
     def create_color_gradients(self, light:QColor, mid:QColor, dark:QColor):
         """A method to create nice gradients between the selected colors to make the button look like
@@ -183,34 +177,40 @@ class CircleButton(QtWidgets.QPushButton):
         qp.translate(.5, .5)
         qp.setPen(QtCore.Qt.NoPen)
         rect = self.get_button_rect()
-        # Render if the button is pressed (based on "backgroundDown" and "ringShapeDown" color gradients)
-        if self.isDown() or self.isChecked():
-            # Render yellow if we're in the open state
-            if self.button_open:
-                qp.setBrush(self.open_color_gradients[1])
-                qp.drawEllipse(rect)
-                qp.setBrush(self.open_color_gradients[3])
-                qp.drawEllipse(rect)
-            # Otherwise render red if we're in the closed state
+        if self.isEnabled():
+            # Render if the button is pressed (based on "backgroundDown" and "ringShapeDown" color gradients)
+            if self.isDown() or self.isChecked():
+                # Render yellow if we're in the open state
+                if self.button_open:
+                    qp.setBrush(self.open_color_gradients[1])
+                    qp.drawEllipse(rect)
+                    qp.setBrush(self.open_color_gradients[3])
+                    qp.drawEllipse(rect)
+                # Otherwise render red if we're in the closed state
+                else:
+                    qp.setBrush(self.closed_color_gradients[1])
+                    qp.drawEllipse(rect)
+                    qp.setBrush(self.closed_color_gradients[3])
+                    qp.drawEllipse(rect)
+            # Render if the button is not pressed (based on "backgroundUp" and "ringShapeUp" color gradients)
             else:
-                qp.setBrush(self.closed_color_gradients[1])
-                qp.drawEllipse(rect)
-                qp.setBrush(self.closed_color_gradients[3])
-                qp.drawEllipse(rect)
-        # Render if the button is not pressed (based on "backgroundUp" and "ringShapeUp" color gradients)
+                # Render yellow if we're in the open state
+                if self.button_open:
+                    qp.setBrush(self.open_color_gradients[0])
+                    qp.drawEllipse(rect)
+                    qp.setBrush(self.open_color_gradients[2])
+                    qp.drawEllipse(rect)
+                # Otherwise render red if we're in the closed state
+                else:
+                    qp.setBrush(self.closed_color_gradients[0])
+                    qp.drawEllipse(rect)
+                    qp.setBrush(self.closed_color_gradients[2])
+                    qp.drawEllipse(rect)
         else:
-            # Render yellow if we're in the open state
-            if self.button_open:
-                qp.setBrush(self.open_color_gradients[0])
-                qp.drawEllipse(rect)
-                qp.setBrush(self.open_color_gradients[2])
-                qp.drawEllipse(rect)
-            # Otherwise render red if we're in the closed state
-            else:
-                qp.setBrush(self.closed_color_gradients[0])
-                qp.drawEllipse(rect)
-                qp.setBrush(self.closed_color_gradients[2])
-                qp.drawEllipse(rect)
+            qp.setBrush(self.disabled_color_gradients[0])
+            qp.drawEllipse(rect)
+            qp.setBrush(self.disabled_color_gradients[2])
+            qp.drawEllipse(rect)
 
 
     def mouseMoveEvent(self, event:QMouseEvent):
@@ -244,13 +244,24 @@ class CircleButton(QtWidgets.QPushButton):
             super().mouseReleaseEvent(event)
 
     
-    def move(self, a0:QPoint):
+    def move(self, *args):
         """Overwrites the QPushButton move method to constrain the button within its parent widget
 
         Args:
-            a0 (QPoint): Where we're moving to
+            a0 (QPoint or x,y): Where we're moving to
         """
-        # If we have a parent widget...
+        # *args is a tuple, not sure if this is the best way to process it but trying it out
+        # If it's length 1, it's probably a QPoint
+        if len(args) == 1:
+            a0 = args[0]
+        # If it's length 2, it's probably an x,y coord
+        elif len(args) == 2:
+            a0 = QPoint(args[0], args[1])
+        # Otherwise, chuck it to the original move method for a more intelligible error message
+        else:
+            super().move(*args)
+            return
+        
         if self.parentWidget() is not None:
             # Cap each cardinal extreme of the circular button to make sure they stay within the parent dimensions
             if self.geometry().right() >= self.parentWidget().size().width():
@@ -263,6 +274,7 @@ class CircleButton(QtWidgets.QPushButton):
                 a0.setY(self.parentWidget().size().height() - self.radius)
 
         super().move(a0)
+
     
     def moveEvent(self, a0):
         # print(self.geometry().center())
