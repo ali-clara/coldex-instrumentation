@@ -33,16 +33,16 @@ class CircleButton(QtWidgets.QPushButton):
         self._mouse_move_pos = None # Position of mouse movement
         self.button_locked = False  # Are we allowing the button to move
 
-        self.child_baselines = []
-        for child in ducklings:
-            try:
-                child.geometry()
-            except AttributeError:
-                baseline = np.nan
-            else:
-                baseline = child.geometry().bottom()
+        # self.child_baselines = []
+        # for child in ducklings:
+        #     try:
+        #         child.geometry()
+        #     except AttributeError:
+        #         baseline = np.nan
+        #     else:
+        #         baseline = child.geometry().bottom()
 
-            self.child_baselines.append(baseline)
+        #     self.child_baselines.append(baseline)
 
 
     def create_color_gradients(self, light:QColor, mid:QColor, dark:QColor):
@@ -244,10 +244,31 @@ class CircleButton(QtWidgets.QPushButton):
             super().mouseReleaseEvent(event)
 
     
+    def move(self, a0:QPoint):
+        """Overwrites the QPushButton move method to constrain the button within its parent widget
+
+        Args:
+            a0 (QPoint): Where we're moving to
+        """
+        # If we have a parent widget...
+        if self.parentWidget() is not None:
+            # Cap each cardinal extreme of the circular button to make sure they stay within the parent dimensions
+            if self.geometry().right() >= self.parentWidget().size().width():
+                a0.setX(self.parentWidget().size().width() - self.radius)
+            if self.geometry().left() < 0:
+                a0.setX(0)
+            if self.geometry().top() < 0:
+                a0.setY(0)
+            if self.geometry().bottom() >= self.parentWidget().size().height():
+                a0.setY(self.parentWidget().size().height() - self.radius)
+
+        super().move(a0)
+    
     def moveEvent(self, a0):
-        print(self.geometry().center())
+        # print(self.geometry().center())
+
         if self.ducklings is not None:
-            for i, child in enumerate(self.ducklings):
+            for child in self.ducklings:
                 child_width = child.geometry().width()
                 # Create a new geometry for the child object
                 new_geo = QRect()
@@ -255,11 +276,11 @@ class CircleButton(QtWidgets.QPushButton):
                 new_geo.setRight(self.geometry().center().x() + int(child_width/2))
                 if child.geometry().bottom() > self.geometry().center().y():
                     new_geo.setTop(self.geometry().center().y())
-                    new_geo.setBottom(self.child_baselines[i])
+                    new_geo.setBottom(child.baseline())
                 else:
                     new_geo.setBottom(self.geometry().center().y())
-                    new_geo.setTop(self.child_baselines[i])
-
+                    new_geo.setTop(child.baseline())
+                # Assign the child that new geometry
                 child.setGeometry(new_geo)
                     
 
@@ -275,6 +296,7 @@ if __name__ == "__main__":
     qapp = QApplication(sys.argv)
     w = QWidget()
     w.setMinimumSize(100, 100)
+    w.setMaximumSize(500, 500)
 
     myButton = CircleButton(50, w)
     myButton.clicked.connect(clicked)

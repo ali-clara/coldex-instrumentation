@@ -1,4 +1,6 @@
 from PyQt5.QtWidgets import *
+from PyQt5.QtGui import *
+from PyQt5.QtCore import *
 
 class HLine(QFrame):
     """A horizontal line"""
@@ -12,12 +14,25 @@ class HLine(QFrame):
 
 class VLine(QFrame):
     """A vertical line"""
-    def __init__(self, ducklings=None):
-        super().__init__()
+    def __init__(self, parent=None, baseline=None, ducklings=None):
+        super().__init__(parent)
         self.setMinimumWidth(20)
         self.setFrameShape(QFrame.VLine)
         self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
 
+        print(self.parent())
+        print(self.parentWidget().geometry().size())
+
+        if baseline is None:
+            baseline = int(self.parentWidget().geometry().height() / 2)
+        self.baseline_position = baseline
+
+    def baseline(self):
+        return self.baseline_position
+    
+    def setBaseline(self, baseline):
+        self.baseline_position = baseline
+    
         
 if __name__ == "__main__":
     import sys
@@ -30,13 +45,13 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     widget = QWidget()
 
-    separator_vertical = VLine()
-    separator_vertical.setParent(widget)
+    separator_vertical = VLine(widget)
     separator_vertical.setGeometry(500, 70, 4, 60)
 
+    print(widget.geometry().size())
+
     button = CircleButton(50, widget, ducklings=[separator_vertical])
-    button.setParent(widget)
-    button.move(button_locs["button 1"]["x"], button_locs["button 1"]["y"])
+    button.move(QPoint(button_locs["button 1"]["x"], button_locs["button 1"]["y"]))
     print(button.geometry().center())
 
     widget.show()
