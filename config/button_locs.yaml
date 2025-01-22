@@ -1,3 +1,72 @@
-button 0:
-  x: 24
-  y: 23
+button 1:
+  x: 32
+  y: 258
+button 2:
+  x: 141
+  y: 258
+button 3:
+  x: 208
+  y: 73
+button 4:
+  x: 308
+  y: 73
+button 5:
+  x: 408
+  y: 73
+button 6:
+  x: 208
+  y: 443
+button 7:
+  x: 308
+  y: 443
+button 8:
+  x: 408
+  y: 443
+button 9:
+  x: 498
+  y: 198
+button 10:
+  x: 498
+  y: 296
+button 11:
+  x: 598
+  y: 98
+button 12:
+  x: 698
+  y: 98
+button 13:
+  x: 798
+  y: 98
+button 14:
+  x: 874
+  y: 223
+button 15:
+  x: 649
+  y: 379
+button 16:
+  x: 724
+  y: 379
+button 17:
+  x: 799
+  y: 379
+button 18:
+  x: 874
+  y: 379
+button 19:
+  x: 949
+  y: 379
+button 20:
+  x: 1024
+  y: 379
+button 21:
+  x: 1099
+  y: 379
+button 22:
+  x: 888
+  y: 500
+button 23:
+  x: 923
+  y: 501
+button 24:
+  x: 954
+  y: 500

@@ -10,7 +10,7 @@ except ModuleNotFoundError:
     from pyqt_helpers.lines import VLine, HLine
 
 class CircleButton(QPushButton):
-    def __init__(self, radius=None, parent=None, ducklings=[]):
+    def __init__(self, radius:int=None, parent:QObject=None, start_pos:tuple=(0,0), locked=True, ducklings=[]):
         super().__init__(parent)
         
         ### ----- general ----- ###
@@ -18,6 +18,8 @@ class CircleButton(QPushButton):
         # Flag to keep track of the button "state" - pneumatic valve open or closed
         self.button_open = False
         self.ducklings = ducklings
+        self.init_button_position(start_pos)
+        
 
         ### ----- colors ----- ###
         closed_light = QColor(247, 217, 126, 255)
@@ -37,8 +39,12 @@ class CircleButton(QPushButton):
         ### ----- movement ----- ###
         self._mouse_press_pos = self.geometry().center() # Position of mouse click, initialized to reasonable QPoint
         self._mouse_move_pos = self.geometry().center() # Position of mouse movement, initialized to reasonable QPoint
-        self.button_locked = True  # Are we allowing the button to move
+        self.button_locked = locked  # Are we allowing the button to move
 
+    def init_button_position(self, start_pos):
+        start_pos = QPoint(int(start_pos[0]-self.radius/2), int(start_pos[1]-self.radius/2))
+        self.move(start_pos)
+    
     def create_color_gradients(self, light:QColor, mid:QColor, dark:QColor):
         """A method to create nice gradients between the selected colors to make the button look like
         a 3D object. Graphic deign go brr!
@@ -105,6 +111,9 @@ class CircleButton(QPushButton):
     def unlock_button_movement(self):
         self.button_locked = False
 
+    def get_center(self):
+        return self.geometry().center().x(), self.geometry().center().y()
+
     def set_radius(self, radius=None):
         """Method to set the button radius. If left blank, sets the radius as twice the button font size
 
@@ -119,7 +128,7 @@ class CircleButton(QPushButton):
         # Notify the layout manager that the size hint has changed
         self.updateGeometry()
     
-    def get_button_rect(self):
+    def get_button_rect(self) -> QRect:
         """Creates a QRect object based on the internal button size
 
         Returns:
@@ -170,6 +179,18 @@ class CircleButton(QPushButton):
         """
         return width
 
+    
+    def paint_text(self, qp:QPainter):
+        rect = self.get_button_rect()
+
+        fm = QFontMetrics(self.font())
+        width = fm.horizontalAdvance(self.text())
+        height = fm.height()
+        pos = QPoint(rect.center().x() - int(width/2), rect.center().y() + int(height/2.75))
+        
+        qp.setPen(QColor(0, 0, 0, 255))
+        qp.drawText(pos, self.text())
+
     def paintEvent(self, event):
         """Overwrites the paintEvent method. Renders the circular button"""
         qp = QPainter(self)
@@ -206,11 +227,14 @@ class CircleButton(QPushButton):
                     qp.drawEllipse(rect)
                     qp.setBrush(self.closed_color_gradients[2])
                     qp.drawEllipse(rect)
+            
         else:
             qp.setBrush(self.disabled_color_gradients[0])
             qp.drawEllipse(rect)
             qp.setBrush(self.disabled_color_gradients[2])
             qp.drawEllipse(rect)
+        
+        self.paint_text(qp)
 
 
     def mouseMoveEvent(self, event:QMouseEvent):
@@ -310,8 +334,10 @@ if __name__ == "__main__":
     w.setMinimumSize(100, 100)
     w.setMaximumSize(500, 500)
 
-    myButton = CircleButton(50, w)
+    myButton = CircleButton(100, w, locked=False)
     myButton.clicked.connect(clicked)
+    myButton.setText("hi!")
+    myButton.setFont(QFont("Helvetica", 12))
 
     w.show()
     qapp.exec_()

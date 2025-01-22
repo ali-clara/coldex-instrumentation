@@ -7,16 +7,9 @@
 #   data_saving.yaml config file and add a data suffix. This will create a new file with an updated header, so you don't run
 #   the risk of saving data to the incorrect header.
 ---
+Pressure sensor:
+  Time (epoch): []
+  Data:
+    Pressure (Torr): []
 Arduino:
   Time (epoch): []
-  Data:
-    Arduino data 1: []
-  Control:
-    Arduino control 1:
-Dummy sensor:
-  Time (epoch): []
-  Data:
-    Dummy sensor data 1 (mm): []
-    Dummy sensor data 2 (mBar): []
-  Control:
-    Dummy sensor control 1:

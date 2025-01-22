@@ -2,7 +2,8 @@
 # This is the Graphical User Interface (GUI) - true to its name, many graphs and user interfaces going on here!
 # I've tried to make it as modular as possible, so adding additional sensors in the future won't be as much of a pain.
 # 
-# Most of the GUI features - like what sensors we display, what notetaking capabilities we need out of a logging panel,
+# Most of the GUI features - like what sensors we display, what notetaking capabilities we need out of a logging panel, etc
+# are managed through external YAML files
 # -------------
 
 from PyQt5 import QtWidgets, QtCore
@@ -77,6 +78,9 @@ class ApplicationWindow(QWidget):
         self.norm12 = QFont("Helvetica", 12)
         self.norm10 = QFont("Helvetica", 10)
 
+        with open("config/project_metadata.yaml", "r") as stream:
+            self.metadata_dict = yaml.safe_load(stream)
+
         # Initialize the main sense-interpret-save data pipeline
         self.init_data_pipeline()
         
@@ -96,6 +100,8 @@ class ApplicationWindow(QWidget):
         right_widget.setLayout(self.build_plotting_layout(QVBoxLayout()))
 
         # 3. Bottom panel: pneumatic layout
+        self.buttons_locked = True
+        self.num_buttons = 24
         self.pneumatic_grid_buttons = []
         self.pneumatic_autonomous_controls = []
         bottom_widget = QWidget(self)
@@ -167,12 +173,29 @@ class ApplicationWindow(QWidget):
             self.accept_quit = False
 
     ## --------------------- HELPERS --------------------- ## 
-    def _make_default_label(self, text, font):
+    def default_label(self, text:str="Label", font:QFont=QFont("Helvetica", 12)):
         label = QLabel(self)
         label.setText(text)
         label.setFont(font)
+        label.setMaximumHeight(50)
         label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
         return label
+    
+    def default_button(self, text:str="", font=QFont("Helvetica", 12), callback=None, enabled=True, requires_self=False):
+        button = QPushButton(text, self)
+        button.setFont(font) 
+        button.setEnabled(enabled)
+        if not requires_self:
+            button.clicked.connect(callback)
+        else:
+            button.clicked.connect(partial(callback, button))
+        return button
+    
+    def dividing_line(self, orientation=QFrame.HLine):
+        dividing_line = QFrame(self)
+        dividing_line.setFrameShape(orientation)
+        return dividing_line
+        
 
     ## --------------------- SENSOR STATUS & CONTROL --------------------- ## 
        
@@ -202,9 +225,9 @@ class ApplicationWindow(QWidget):
         """Method to initialize dictionaries to hold sensor control information, namely their status and setpoint control values
         """
         # Every instrument has a status value, so initialize a dictionary with a status entry for every sensor
-        self.sensor_status_dict = {}
-        for name in self.sensor_names:
-            self.sensor_status_dict.update({name:0}) # "0" means offline
+        self.instrument_status_dict = {}
+        for name in self.instrument_names:
+            self.instrument_status_dict.update({name:0}) # "0" means offline
 
         # The instruments that have setpoint control values have that set in the sensor_data configuration file, which 
         # lives in self.big_data dict. If there's a key corresponding to "Control", add the sensor and the name of the
@@ -250,15 +273,18 @@ class ApplicationWindow(QWidget):
         self.title_buttons = {} # Holding onto the buttons for later
         for row in range(1, num_rows+1): # Adjusting for the QLabel title that we put on row 1
             for col in range(num_cols):
-                button_text = title_button_text[i]
-                button = QPushButton(self)
-                button.setText(button_text)
-                button.setFont(self.norm12)
-                button.pressed.connect(title_button_info[button_text]["callback"]) # set the button callback
-                button.setEnabled(title_button_info[button_text]["enabled"]) # set the button initial state (enabled/disabled)
-                parent.addWidget(button, row, col)
-                self.title_buttons.update({button_text:button})
-                i+=1
+                try:
+                    button_text = title_button_text[i]
+                    button = QPushButton(self)
+                    button.setText(button_text)
+                    button.setFont(self.norm12)
+                    button.pressed.connect(title_button_info[button_text]["callback"]) # set the button callback
+                    button.setEnabled(title_button_info[button_text]["enabled"]) # set the button initial state (enabled/disabled)
+                    parent.addWidget(button, row, col)
+                    self.title_buttons.update({button_text:button})
+                    i+=1
+                except IndexError:
+                    pass
 
         # Add a separation line to the layout after all the buttons
         line = QFrame(self)
@@ -286,9 +312,9 @@ class ApplicationWindow(QWidget):
             start_next_row (int): What row of a QGridLayout any further widgets should start on
         """
         # For all the sensors, create control buttons (if applicable) and a status indicator
-        self.sensor_status_display = {} # Holding onto the status displays for later
+        self.instrument_status_display = {} # Holding onto the status displays for later
         row = starting_row
-        for sensor in self.sensor_names:
+        for sensor in self.instrument_names:
             # First widget we want to place - the sensor title
             title = QLabel(self)
             title.setFont(self.bold12)
@@ -305,7 +331,7 @@ class ApplicationWindow(QWidget):
             status.setAlignment(Qt.AlignCenter)
             parent.addWidget(status, row, 0, 1, colspan)
             row +=1
-            self.sensor_status_display.update({sensor:status}) # Hold onto the status display for later
+            self.instrument_status_display.update({sensor:status}) # Hold onto the status display for later
             # Third widget - sensor buttons (initialize, shutdown, start, etc)
             # If this sensor has buttons to add...
             try:
@@ -381,14 +407,14 @@ class ApplicationWindow(QWidget):
 
         # Initialize a dictionary of general title buttons - these functions control all the sensors or general large GUI functions
         title_buttons = {}
-        title_button_names = ["Initialize All Sensors", "Shutdown All Sensors", "Start Data Collection", "Stop Data Collection"]
-        title_button_callbacks = [self._on_sensor_init, self._on_sensor_shutdown, self._on_start_data, self._on_stop_data]
-        title_button_enabled = [True, True, False, False]
+        title_button_names = ["Initialize All Sensors", "Shutdown All Sensors", "New Project", "Update Project", "Stop"]
+        title_button_callbacks = [self._on_sensor_init, self._on_sensor_shutdown, self._on_new_project, self._on_update_project, self._on_stop_data]
+        title_button_enabled = [True, True, True, False, True]
         for name, callback, enabled in zip(title_button_names, title_button_callbacks, title_button_enabled):
             title_buttons.update({name: {"callback":callback, "enabled":enabled}})
 
-        # Initialize a dictionary of buttons for each sensor. These buttons do whatever they say on the tin (e.g "Start Picarro"
-            # runs the initialization sequence for the Picarro.)
+        # Initialize a dictionary of buttons for each sensor. These buttons do whatever they say on the tin (e.g "Start X"
+            # runs the initialization sequence for X.)
             # I want the "status" bar of each sensor to update when some of these buttons are pressed, so I do something a little cheeky
             # with their callbacks - using "partial()" creates a temporary function where the first argument is the function 
             # to execute and the following arguments are its inputs. I use this to pass each sensor button function into a general
@@ -419,8 +445,8 @@ class ApplicationWindow(QWidget):
             initialization_function (method): Whatever you want the sensor button to do
         """
         init_result = initialization_function()
-        self.sensor_status_dict.update({sensor: init_result})
-        self.update_sensor_status()
+        self.instrument_status_dict.update({sensor: init_result})
+        self.update_instrument_status()
 
     def _on_sensor_init(self):
         """Callback function for the 'Initialize All Sensors' button
@@ -431,18 +457,17 @@ class ApplicationWindow(QWidget):
         worker.signals.result.connect(self._finished_sensor_init)
         self.threadpool.start(worker)
 
-    def _finished_sensor_init(self, sensor_status:dict):
+    def _finished_sensor_init(self, instrument_status:dict):
         """Method that gets triggered when that thread^ in _on_sensor_init finishes.
 
         Args:
-            sensor_status (dict): dictionary returned from self.sensor.initialize_sensors
+            instrument_status (dict): dictionary returned from self.sensor.initialize_sensors
         """
         # Update the sensor status dictionary and the GUI
-        self.sensor_status_dict = sensor_status
-        self.update_sensor_status()
+        self.instrument_status_dict = instrument_status
+        self.update_instrument_status()
         # Enable the data collection buttons
-        self.title_buttons["Start Data Collection"].setEnabled(True)
-        self.title_buttons["Stop Data Collection"].setEnabled(True)
+        self.title_buttons["New Project"].setEnabled(True)
         
     def _on_sensor_shutdown(self):
         """Callback function for the 'Shutdown All Sensors' button
@@ -454,28 +479,132 @@ class ApplicationWindow(QWidget):
         worker.signals.result.connect(self._finished_sensor_shutdown)
         self.threadpool.start(worker)
 
-    def _finished_sensor_shutdown(self, sensor_status:dict):
+    def _finished_sensor_shutdown(self, instrument_status:dict):
         """Method that gets triggered when that thread^ in _on_sensor_shutdown finishes.
 
         Args:
-            sensor_status (dict): dictionary returned from self.sensor.shutdown_sensors
+            instrument_status (dict): dictionary returned from self.sensor.shutdown_sensors
         """
         # Update the sensor status dictionary and the GUI
-        self.sensor_status_dict = sensor_status
-        self.update_sensor_status()
-        # Enable the data collection buttons
-        self.title_buttons["Start Data Collection"].setEnabled(False)
-        self.title_buttons["Stop Data Collection"].setEnabled(False)
+        self.instrument_status_dict = instrument_status
+        self.update_instrument_status()
     
-    def _on_start_data(self):
-        """Callback function for the "Start Data Collection" button. Sets the data_collection flag to true
+    def _on_update_project(self):
+        update_button = self.default_button("Update", self.bold12, self._on_update_metadata)
+        self._sample_data_UI("Update Sample Data", update_button)
+
+    def _on_new_project(self):
+        #### reset status logs, start new data file
+        start_button = self.default_button("Start", self.bold12, self._on_start_data)
+        self._sample_data_UI("New Sample Data", start_button)
+
+    def _sample_data_UI(self, title:str, enter_button:QPushButton):
+        """Long but fairly straightforward! Method that builds the layout for the "New Project" and "Update Project" buttons. 
+        Creates a user-entry grid based on the entries set in project_metadata.yaml.
+
+        Args:
+            title (str): Window title
+            enter_button (QPushButton): The "enter" button (complete with callback) - since I use this method for both new and update, 
+                I want "enter" to do different things
         """
-        self.data_collection = True
+        # Create and name a new window
+        self.new_project_window = QWidget()
+        self.new_project_window.setWindowTitle(title)
+        layout = QVBoxLayout()
+        
+        layout.addWidget(self.default_label(title, self.bold12), alignment=Qt.AlignCenter)
+        layout.addWidget(self.dividing_line())
+
+        # First thing on the entry form: sample metadata (date, researcher, etc)
+        metadata_layout = QHBoxLayout()
+        metadata_layout.addWidget(self.dividing_line(QFrame.VLine))
+        # For each piece of data to collect, add a text entry
+        user_metadata = self.metadata_dict["New project"]["User metadata"]
+        self.new_project_entries = {}
+        for data in user_metadata:
+            # First widget - label
+            label = self.default_label(data, font=self.norm10)
+            metadata_layout.addWidget(label)
+            # Second widget - text entry box
+            entry = QLineEdit(self)
+            metadata_layout.addWidget(entry)
+            # Hang onto the text entry box widget for later
+            self.new_project_entries.update({data: entry})
+            # Third widget - dividing line
+            metadata_layout.addWidget(self.dividing_line(QFrame.VLine))
+
+        # Add the sample metadata and some dividing lines
+        layout.addLayout(metadata_layout)
+        layout.addWidget(self.dividing_line())
+        layout.addWidget(self.dividing_line())
+
+        # Second thing on the entry form: sample data (measurements, coreID, etc)
+        sample_layout = QGridLayout()
+        sample_layout.addWidget(self.dividing_line(QFrame.VLine), 0, 0, 2, 1)
+        # More data entry - slightly more complicated because we're using multiple columns here
+        widgets_per_col = 2
+        sample_data = self.metadata_dict["New project"]["Sample data"]
+        sample_rows, sample_cols = find_grid_dims(len(sample_data), len(sample_data)*widgets_per_col)
+        i = 0
+        for row in range(0, sample_rows):
+            for col in range(1, sample_cols+1, widgets_per_col):
+                data = sample_data[i]
+                # First widget - label
+                label = self.default_label(data, font=self.norm10)
+                sample_layout.addWidget(label, row, col)
+                # Second widget - text entry box
+                entry = QLineEdit(self)
+                sample_layout.addWidget(entry, row+1, col)
+                # Again, hang onto the data entry
+                self.new_project_entries.update({data: entry})
+                # Third widget - dividing line
+                sample_layout.addWidget(self.dividing_line(QFrame.VLine), row, col+1, 2, 1)
+                i+=1
+
+        # Add the sample data and another dividing line        
+        layout.addLayout(sample_layout)
+        layout.addWidget(self.dividing_line())
+        layout.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+
+        # Add buttons
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(enter_button,
+                                alignment = Qt.AlignRight)
+        button_layout.addWidget(self.default_button("Cancel", self.bold12, self.new_project_window.close), 
+                                alignment=Qt.AlignLeft)
+
+        button_layout.setAlignment(Qt.AlignVCenter | Qt.AlignBottom)
+        layout.addLayout(button_layout, stretch=1)
+
+        # Add the widgets to the new window and show the window
+        self.new_project_window.setLayout(layout)
+        self.new_project_window.show()
+
+    def _on_start_data(self):
+        for key in self.new_project_entries:
+            print(f"{key}: {self.new_project_entries[key].text()}")
+
+        print("Data collection currently deactivated")
+
+        self.new_project_window.close()
+        self.title_buttons["Update Project"].setEnabled(True)
+
+        # self.data_collection = True
+
+    def _on_update_metadata(self):
+        for key in self.new_project_entries:
+            print(f"{key}: {self.new_project_entries[key].text()}")
+
+        print("Not saving metadata yet")
+
+        self.new_project_window.close()
+        
         
     def _on_stop_data(self):
         """Callback function for the "Stop Data Collection" button. Sets the data_collection flag to false
         """
         self.data_collection = False
+        self.title_buttons["Update Project"].setEnabled(False)
 
     def _send_control_input(self, sensor:str, input_name:str, control_function):
         """Method to grab the control input out of the self.sensor_control_inputs dictionary
@@ -505,12 +634,12 @@ class ApplicationWindow(QWidget):
         line.setPlaceholderText(f"{input_name}: {current_input}")
         line.clear()
 
-    def update_sensor_status(self):
+    def update_instrument_status(self):
         """Method to update the sensor status upon initialization or shutdown. Uses the values stored in
-        self.sensor_status_dict to set the color and text of each sensor status widget."""
+        self.instrument_status_dict to set the color and text of each sensor status widget."""
         # Loop through the sensors and grab their status from the sensor status dictionary
-        for name in self.sensor_names:
-            status = self.sensor_status_dict[name]
+        for name in self.instrument_names:
+            status = self.instrument_status_dict[name]
             # If we're offline
             if status == 0:
                 # color = "#D80F0F"
@@ -534,77 +663,86 @@ class ApplicationWindow(QWidget):
                 text = "?????"
 
             # Update the sensor status accordingly
-            status = self.sensor_status_display[name] # This is a dictionary of QLabels
+            status = self.instrument_status_display[name] # This is a dictionary of QLabels
             status.setText(text)
             status.setStyleSheet(f"background-color:{color}; margin:10px")
 
     ## --------------------- PNEUMATIC GRID --------------------- ##
 
     def build_pneumatic_layout(self, bottom_layout:QHBoxLayout):
-        
+
+        # left        
         pneum_control_frame = self.make_pneumatic_control()
-        pneum_grid = QGridLayout()
-        pneum_grid_sidebar = QVBoxLayout()
 
         # middle
+        pneum_grid = QGridLayout()
         line = QFrame(self)
         line.setFrameShape(QFrame.VLine)
-        pneum_grid.addWidget(line, 0, 0, 2, 1)
+        pneum_grid.addWidget(line, 0, 0, 4, 1)
 
-        label = self._make_default_label("Pneumatic Grid", self.bold16)
+        label = self.default_label("Pneumatic Grid", self.bold16)
         pneum_grid.addWidget(label, 0, 1)
                              
         pneum_widget = self.make_pneumatic_button_grid()
         pneum_grid.addWidget(pneum_widget, 1, 1)
 
+        button = self.default_button("Edit Button Layout", self.norm12, self._on_edit_pneumatic_buttons)
+        pneum_grid.addWidget(button, 3, 1, alignment=Qt.AlignBottom|Qt.AlignRight)
+
         line = QFrame(self)
         line.setFrameShape(QFrame.VLine)
-        pneum_grid.addWidget(line, 0, 2, 2, 1)
+        pneum_grid.addWidget(line, 0, 2, 4, 1)
         
         # right
-        button = QPushButton(self)
-        button.setText("Unlock Button Positions")
-        button.setFont(self.norm12)
-        button.setMinimumWidth(int(self.width()*0.15))
-        button.clicked.connect(partial(self._control_pneumatic_button_movement, button))
-        pneum_grid_sidebar.addWidget(button)
+        # status bar
+        status_panel = QVBoxLayout()
 
-        button = QPushButton(self)
-        button.setText("Save button positions")
-        button.setFont(self.norm12)
-        button.clicked.connect(self._save_pneumatic_button_positions)
-        pneum_grid_sidebar.addWidget(button)
+        label = self.default_label("Status", self.bold16)
+        status_panel.addWidget(label)
 
-        pneum_grid_sidebar.setAlignment(QtCore.Qt.AlignCenter)
+        list_widget = QListWidget(self)
+        list_widget.setMaximumHeight(int(pneum_widget.height()*0.75))
+
+        # Add some items to the list
+        for i in range(20):
+            list_widget.addItem(f"Item {i}")
+            # Create a scrollbar and connect it to the list
+        
+        scrollbar = QScrollBar(self)
+        scrollbar.setMaximum(list_widget.count())
+        scrollbar.sliderMoved.connect(list_widget.setCurrentRow)
+
+        status_panel.addWidget(list_widget, alignment=Qt.AlignTop)
+        # status_panel.addWidget(scrollbar)
+
+
+        # status_panel.setAlignment(QtCore.Qt.AlignTop)
 
         bottom_layout.addLayout(pneum_control_frame)
         bottom_layout.addLayout(pneum_grid)
-        bottom_layout.addLayout(pneum_grid_sidebar)
+        bottom_layout.addLayout(status_panel)
 
         return bottom_layout
     
     def make_pneumatic_control(self):
         pneum_control_frame = QVBoxLayout()
 
-        label = self._make_default_label("Control Method", self.bold16)
+        label = self.default_label("Control Method", self.bold16)
         pneum_control_frame.addWidget(label)
 
-        label = self._make_default_label("Manual Valve Controls", self.norm12)
+        label = self.default_label("Manual Valve Controls", self.norm12)
         pneum_control_frame.addWidget(label)
 
-        button = QPushButton(self)
+        button = self.default_button(callback=self._on_manual_valve_control, requires_self=True)
         button.setCheckable(True)
         button.setStyleSheet("background-color : green")
         button.setFixedWidth(int(label.width() * 1.5))
-        
-        button.clicked.connect(partial(self._on_manual_valve_control, button))
         pneum_control_frame.addWidget(button, alignment=QtCore.Qt.AlignHCenter)
 
-        line = QFrame(self)
-        line.setFrameShape(QFrame.HLine)
+        line = self.dividing_line()
         pneum_control_frame.addWidget(line)
 
-        label = self._make_default_label("Automation Routine", self.norm12)
+        label = self.default_label("Automation Routine", self.norm12)
         pneum_control_frame.addWidget(label)
 
         dropdown = QComboBox()
@@ -619,24 +757,18 @@ class ApplicationWindow(QWidget):
 
         buttons_layout = QHBoxLayout()
 
-        button = QPushButton()
+        button = self.default_button(callback=partial(self._on_start_autonomous, dropdown), enabled=False)
         button.setIcon(QIcon("doc/imgs/play.png"))
-        button.clicked.connect(partial(self._on_start_autonomous, dropdown))
-        button.setDisabled(True)
         self.pneumatic_autonomous_controls.append(button)
         buttons_layout.addWidget(button) 
 
-        button = QPushButton()
+        button = self.default_button(callback=partial(self._on_pause_autonomous, dropdown), enabled=False)
         button.setIcon(QIcon("doc/imgs/pause.png"))
-        button.clicked.connect(partial(self._on_pause_autonomous, dropdown))
-        button.setDisabled(True)
         self.pneumatic_autonomous_controls.append(button)
         buttons_layout.addWidget(button) 
 
-        button = QPushButton()
+        button = self.default_button(callback=partial(self._on_stop_autonomous, dropdown), enabled=False)
         button.setIcon(QIcon("doc/imgs/stop.png"))
-        button.clicked.connect(partial(self._on_stop_autonomous, dropdown))
-        button.setDisabled(True)
         self.pneumatic_autonomous_controls.append(button)
         buttons_layout.addWidget(button) 
 
@@ -653,14 +785,37 @@ class ApplicationWindow(QWidget):
         parent_widget.setMinimumHeight(int(self.height()/2.25))
         parent_widget.setMinimumWidth(int(self.width()*0.6))
 
-        def yey():
-            print("clicked")
+        with open("config/button_locs.yaml", "r") as stream:
+            button_locs = yaml.safe_load(stream)
 
-        button = CircleButton(radius=50, parent=parent_widget)
-        self.pneumatic_grid_buttons.append(button)
-        button.clicked.connect(yey)
-        
+        def yey(button_num):
+            print(f"button {button_num} clicked")
+
+        for i in range(1, self.num_buttons+1):
+            start_pos = (button_locs[f"button {i}"]["x"], button_locs[f"button {i}"]["y"])
+            button = CircleButton(radius=65, parent=parent_widget, start_pos=start_pos)
+            button.setText(str(i))
+            button.setFont(self.norm12)
+            self.pneumatic_grid_buttons.append(button)
+            button.clicked.connect(partial(yey, i))
+
         return parent_widget
+    
+    def _on_edit_pneumatic_buttons(self):
+
+        # Needs to be a class variable otherwise it goes out of scope        
+        self.button_edit_window = AnotherWindow("Edit Valve Buttons")
+        
+        button_text = "Unlock Button Positions" if self.buttons_locked else "Lock Button Positions"
+        button = self.default_button(button_text, self.norm12, self._control_pneumatic_button_movement, requires_self=True)
+        button.setMinimumWidth(int(self.width()*0.15)) # Set our width to be 15% of the main window. Just to look nice
+        self.button_edit_window.set_widget(button)
+
+        button = self.default_button("Save Button Positions", self.norm12, self._save_pneumatic_button_positions)
+        self.button_edit_window.set_widget(button)
+
+        self.button_edit_window.show()
+
     
     def _on_manual_valve_control(self, button:QPushButton):
         # If button is checked
@@ -697,21 +852,23 @@ class ApplicationWindow(QWidget):
     def _control_pneumatic_button_movement(self, control_button:QPushButton):
         if self.pneumatic_grid_buttons[0].button_locked:
             for pneumatic_button in self.pneumatic_grid_buttons:
-                pneumatic_button.unlock_button_movement()
-                control_button.setText("Lock Button Positions")
+                pneumatic_button.unlock_button_movement() # Unlock the buttons
+                control_button.setText("Lock Button Positions") # Change the button text to reflect the button status
+                self.buttons_locked = False # Keep track of our own internal flag
         else:
             for pneumatic_button in self.pneumatic_grid_buttons:
                 pneumatic_button.lock_button_movement()
                 control_button.setText("Unlock Button Positions")
+                self.buttons_locked = True
 
     def _save_pneumatic_button_positions(self):
-        for i, pneumatic_button in enumerate(self.pneumatic_grid_buttons):
-            button_loc_dic = {}
-            button_loc_dic.update({f"button {i}": {"x":pneumatic_button.geometry().center().x(), 
-                                                "y":pneumatic_button.geometry().center().y()}})
-            with open("config/button_locs.yaml", "w") as yaml_file:
-                dump = yaml.safe_dump(button_loc_dic)
-                yaml_file.write(dump)
+        button_loc_dic = {}
+        for i, pneumatic_button in enumerate(self.pneumatic_grid_buttons, start=1):
+            button_loc_dic.update({f"button {i}": {"x":pneumatic_button.get_center()[0], 
+                                                "y":pneumatic_button.get_center()[1]}})
+        
+        with open("config/button_locs.yaml", "w") as yaml_file:
+            yaml.dump(button_loc_dic, yaml_file, sort_keys=False)
             
     
     ## --------------------- DATA STREAMING / LIVE PLOTTING --------------------- ##
@@ -725,7 +882,7 @@ class ApplicationWindow(QWidget):
         Args:
             center_layout (QLayout): The main window layout we want to nest the plots in
         """
-        center_layout.setContentsMargins(10, 20, 10, 0)
+        # center_layout.setContentsMargins(10, 20, 10, 0)
         # Make a title
         label = QLabel(self)
         label.setText("Live Sensor Data")
@@ -942,14 +1099,19 @@ class ApplicationWindow(QWidget):
 
         # Comb through the keys, set the timestamp to the current time and the data to zero
         sensor_names = self.big_data_dict.keys()
+        self.instrument_names = list(sensor_names)
+        self.sensor_names = list(sensor_names)
         for name in sensor_names:
-            channels = self.big_data_dict[name]["Data"].keys()
-            self.big_data_dict[name]["Time (epoch)"] = deque([np.nan], maxlen=self.max_buffer_length)
-            for channel in channels:
-                self.big_data_dict[name]["Data"][channel] = deque([np.nan], maxlen=self.max_buffer_length)
+            try:
+                channels = self.big_data_dict[name]["Data"].keys()
+                self.big_data_dict[name]["Time (epoch)"] = deque([np.nan], maxlen=self.max_buffer_length)
+                for channel in channels:
+                    self.big_data_dict[name]["Data"][channel] = deque([np.nan], maxlen=self.max_buffer_length)
+            except KeyError as e:
+                print(f"Trouble reading {name} sensor data: {e}")
+                self.sensor_names.remove(name)
 
         # Grab the names of the sensors from the dictionary
-        self.sensor_names = list(sensor_names)
 
     def _thread_data_collection(self):
         """Method to spin up threads for each sensor, plus the interpreter and the writer. 
@@ -1110,4 +1272,5 @@ class Worker(QRunnable):
 if __name__ == "__main__":
     qapp = QtWidgets.QApplication(sys.argv)
     app = ApplicationWindow()
+
     qapp.exec_()
