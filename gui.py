@@ -748,6 +748,7 @@ class ApplicationWindow(QWidget):
         dropdown = QComboBox()
         dropdown.addItems(['One', 'Two', 'Three', 'Four']) # Replace with automation routines
         dropdown.setDisabled(True)
+        dropdown.setFont(self.norm10)
         self.pneumatic_autonomous_controls.append(dropdown)
         pneum_control_frame.addWidget(dropdown)
 
