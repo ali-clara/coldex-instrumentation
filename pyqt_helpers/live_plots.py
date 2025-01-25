@@ -3,7 +3,10 @@ from collections import deque
 import time
 import matplotlib.pyplot as plt
 
-from pyqt_helpers.helpers import epoch_to_pacific_time
+try:
+    from pyqt_helpers.helpers import epoch_to_pacific_time
+except ModuleNotFoundError:
+    from helpers import epoch_to_pacific_time
 
 ## --------------------- PLOTTING --------------------- ##
 class MyFigureCanvas(FigureCanvas):
@@ -23,20 +26,21 @@ class MyFigureCanvas(FigureCanvas):
         self.x_range = x_range
         self.num_subplots = num_subplots
 
-        # Generate and store a figure axis for the number of subplots passed in
-        self.axs = []
-        for i in range(0, num_subplots):
-            ax = self.figure.add_subplot(num_subplots+1, 1, i+1)
+        # Generate the number of subplots requested
+        self.figure.subplots(num_subplots, 1)
+        self.axs = self.figure.get_axes()
+
+        # Initialize each axis with the provided axes names and initial data
+        for i, ax in enumerate(self.axs):
             ax.plot(x_init[i], y_init[i], '.--')
-            self.axs.append(ax)
             ax.set_xlabel(xlabels[i])
             ax.set_ylabel(ylabels[i])
             if axis_titles is not None:
                 ax.set_title(axis_titles[i])
 
         # Set a figure size
-        self.figure.set_figheight(5*num_subplots)
-        self.figure.tight_layout(h_pad=5)
+        self.figure.set_figheight(4*num_subplots)
+        self.figure.tight_layout()
         
         self.draw()   
 
@@ -71,3 +75,23 @@ class MyFigureCanvas(FigureCanvas):
             ax.set_xlim([x_min_datetime, current_time_datetime])
         # Finally, update the plot
         self.draw()
+
+if __name__ == "__main__":
+    import sys
+    import numpy as np
+    from collections import deque
+    from PyQt5.QtWidgets import *
+
+    app = QApplication(sys.argv)
+    widget = QWidget()
+    layout = QVBoxLayout()
+
+    x = deque([0, 1, 2, 3, 4])
+    y = deque(np.random.randint(-5, 5, size=len(x)))
+    plot = MyFigureCanvas([x], [y], ["x axis"], ["y axis"], num_subplots=1)
+
+    layout.addWidget(plot)
+
+    widget.setLayout(layout)
+    widget.show()
+    app.exec()

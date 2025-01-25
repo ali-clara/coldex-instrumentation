@@ -930,6 +930,7 @@ class ApplicationWindow(QWidget):
             button = QPushButton("Plot Entire Day")
             button.setFont(self.norm12)
             button.pressed.connect(partial(self.plot_entire_day, sensor))
+            button.setMaximumHeight(50)
             # Add the figure, toolbar, and button to this tab's layout
             tab_vbox.addWidget(toolbar, alignment=Qt.AlignHCenter)
             tab_vbox.addWidget(fig)
@@ -942,7 +943,6 @@ class ApplicationWindow(QWidget):
         center_layout.addWidget(self.plot_tab)
 
         return center_layout
-
 
     def _thread_plots(self):
         """Method to update the live plots with the buffers stored in self.big_data_dict
