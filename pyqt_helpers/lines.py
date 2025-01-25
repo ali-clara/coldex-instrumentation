@@ -40,7 +40,7 @@ if __name__ == "__main__":
     import yaml
 
     with open("config/button_locs.yaml", "r") as stream:
-        button_locs = yaml.load(stream)
+        button_locs = yaml.safe_load(stream)
 
     app = QApplication(sys.argv)
     widget = QWidget()
@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
     print(widget.geometry().size())
 
-    button = CircleButton(50, widget, ducklings=[separator_vertical])
+    button = CircleButton(50, widget, ducklings=[separator_vertical], locked=False)
     button.move(button_locs["button 1"]["x"], button_locs["button 1"]["y"])
     print(button.geometry().center())
 
@@ -60,6 +60,3 @@ if __name__ == "__main__":
     button_loc_dic = {}
     button_loc_dic.update({"button 1": {"x":button.geometry().center().x(), "y":button.geometry().center().y()}})
     print(button_loc_dic)
-    with open("config/button_locs.yaml", "w") as yaml_file:
-        dump = yaml.safe_dump(button_loc_dic)
-        yaml_file.write(dump)

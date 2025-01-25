@@ -4,17 +4,17 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtGui import *
 
 
-class ConsolePanelHandler(logging.Handler, QtCore.QObject):
+class GUIHandler(logging.Handler, QtCore.QObject):
     appendText = QtCore.pyqtSignal(str)
     setBackgroundColor = QtCore.pyqtSignal(QColor)
     setTextColor = QtCore.pyqtSignal(QColor)
 
-    def __init__(self, parent, level):
+    def __init__(self, parent:QtWidgets.QTextEdit, level):
         super().__init__(level)
         QtCore.QObject.__init__(self)
         
-        self.widget = QtWidgets.QTextEdit(parent)
-        self.parent = parent
+        # self.widget = parent QtWidgets.QTextEdit(parent)
+        self.widget = parent
 
         self.widget.setReadOnly(True)
         self.appendText.connect(self.widget.append)
@@ -55,8 +55,7 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
 
     widget = QtWidgets.QTextEdit()
-    handler = ConsolePanelHandler(widget, level=logging.DEBUG)
-    
+    handler = GUIHandler(widget, level=logging.DEBUG)
     log.addHandler(handler)
 
     formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(name)s:  %(message)s", datefmt="%H:%M:%S")

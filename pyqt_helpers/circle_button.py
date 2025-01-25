@@ -43,7 +43,7 @@ class CircleButton(QPushButton):
 
     def init_button_position(self, start_pos):
         start_pos = QPoint(int(start_pos[0]-self.radius/2), int(start_pos[1]-self.radius/2))
-        self.move(start_pos)
+        super().move(start_pos)
     
     def create_color_gradients(self, light:QColor, mid:QColor, dark:QColor):
         """A method to create nice gradients between the selected colors to make the button look like
@@ -249,7 +249,7 @@ class CircleButton(QPushButton):
             diff = globalPos - self._mouse_move_pos
             newPos = self.mapFromGlobal(currPos + diff)
             
-            self.move(newPos) #### Should constrain the button to the size of the window
+            super().move(newPos)
 
             self._mouse_move_pos = globalPos
 
@@ -268,24 +268,10 @@ class CircleButton(QPushButton):
             super().mouseReleaseEvent(event)
 
     
-    def move(self, *args):
-        """Overwrites the QPushButton move method to constrain the button within its parent widget
+    def moveEvent(self, event:QMoveEvent):
 
-        Args:
-            a0 (QPoint or x,y): Where we're moving to
-        """
-        # *args is a tuple, not sure if this is the best way to process it but trying it out
-        # If it's length 1, it's probably a QPoint
-        if len(args) == 1:
-            a0 = args[0]
-        # If it's length 2, it's probably an x,y coord
-        elif len(args) == 2:
-            a0 = QPoint(args[0], args[1])
-        # Otherwise, chuck it to the original move method for a more intelligible error message
-        else:
-            super().move(*args)
-            return
-        
+        # Make sure the button is never moved outside of the parent object
+        a0 = event.pos()
         if self.parentWidget() is not None:
             # Cap each cardinal extreme of the circular button to make sure they stay within the parent dimensions
             if self.geometry().right() >= self.parentWidget().size().width():
@@ -298,11 +284,8 @@ class CircleButton(QPushButton):
                 a0.setY(self.parentWidget().size().height() - self.radius)
 
         super().move(a0)
-
-    
-    def moveEvent(self, a0):
-        # print(self.geometry().center())
-
+        
+        # move the child
         if self.ducklings is not None:
             for child in self.ducklings:
                 child_width = child.geometry().width()
@@ -319,8 +302,7 @@ class CircleButton(QPushButton):
                 # Assign the child that new geometry
                 child.setGeometry(new_geo)
                     
-
-        super().moveEvent(a0)
+        super().moveEvent(event)
 
 
 if __name__ == "__main__":
@@ -334,7 +316,7 @@ if __name__ == "__main__":
     w.setMinimumSize(100, 100)
     w.setMaximumSize(500, 500)
 
-    myButton = CircleButton(100, w, locked=False)
+    myButton = CircleButton(100, w, locked=False, start_pos=(50, 110))
     myButton.clicked.connect(clicked)
     myButton.setText("hi!")
     myButton.setFont(QFont("Helvetica", 12))

@@ -23,9 +23,20 @@ from functools import partial
 import concurrent.futures
 import traceback
 import pandas as pd
-
 import logging
 from logdecorator import log_on_start , log_on_end , log_on_error
+
+from pyqt_helpers.live_plots import MyFigureCanvas
+from pyqt_helpers.circle_button import CircleButton
+from pyqt_helpers.custom_logging import GUIHandler
+from pyqt_helpers.lines import VLine
+from pyqt_helpers.helpers import epoch_to_pacific_time, find_grid_dims
+
+from main_pipeline.sensor import Sensor
+from main_pipeline.interpreter import Interpreter
+from main_pipeline.writer import Writer
+from main_pipeline.bus import Bus
+
 # Set up a logger for this module
 logger = logging.getLogger(__name__)
 # Set the lowest-severity log message the logger will handle (debug = lowest, critical = highest)
@@ -38,16 +49,6 @@ logger.addHandler(fh)
 # Create a formatter to specify our log format
 formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(name)s:  %(message)s", datefmt="%H:%M:%S")
 fh.setFormatter(formatter)
-
-from pyqt_helpers.live_plots import MyFigureCanvas
-from pyqt_helpers.circle_button import CircleButton
-from pyqt_helpers.lines import VLine
-from pyqt_helpers.helpers import epoch_to_pacific_time, find_grid_dims
-
-from main_pipeline.sensor import Sensor
-from main_pipeline.interpreter import Interpreter
-from main_pipeline.writer import Writer
-from main_pipeline.bus import Bus
 
 
 # main window
@@ -66,7 +67,7 @@ class ApplicationWindow(QWidget):
         super().__init__()
 
         # Window settings
-        self.setGeometry(50, 50, 2000, 1200) # window size (x-coord, y-coord, width, height)
+        self.setGeometry(50, 50, 2000, 1000) # window size (x-coord, y-coord, width, height)
         self.setWindowTitle("")
 
         # Set some fonts
@@ -700,17 +701,27 @@ class ApplicationWindow(QWidget):
         label = self.default_label("Status", self.bold16)
         status_panel.addWidget(label)
 
-        list_widget = QListWidget(self)
+        list_widget = QTextEdit(self)
         list_widget.setMaximumHeight(int(pneum_widget.height()*0.75))
 
+        handler = GUIHandler(list_widget, level=logging.DEBUG)
+        logger.addHandler(handler)
+        formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(name)s:  %(message)s", datefmt="%H:%M:%S")
+        handler.setFormatter(formatter)
+
+        logger.info("Getting logger {0} - {1}".format(id(logger), logger.handlers))
+        logger.debug("This is normal text")
+        logger.warning("Watch out")
+        logger.error("Something has gone wrong")
+        logger.critical("Oh god everything is broken")
         # Add some items to the list
-        for i in range(20):
-            list_widget.addItem(f"Item {i}")
+        # for i in range(20):
+        #     list_widget.addItem(f"Item {i}")
             # Create a scrollbar and connect it to the list
         
-        scrollbar = QScrollBar(self)
-        scrollbar.setMaximum(list_widget.count())
-        scrollbar.sliderMoved.connect(list_widget.setCurrentRow)
+        # scrollbar = QScrollBar(self)
+        # scrollbar.setMaximum(list_widget.count())
+        # scrollbar.sliderMoved.connect(list_widget.setCurrentRow)
 
         status_panel.addWidget(list_widget, alignment=Qt.AlignTop)
         # status_panel.addWidget(scrollbar)
@@ -790,7 +801,7 @@ class ApplicationWindow(QWidget):
             button_locs = yaml.safe_load(stream)
 
         def yey(button_num):
-            print(f"button {button_num} clicked")
+            logger.info(f"button {button_num} clicked")
 
         for i in range(1, self.num_buttons+1):
             start_pos = (button_locs[f"button {i}"]["x"], button_locs[f"button {i}"]["y"])
