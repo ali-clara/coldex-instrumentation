@@ -89,31 +89,21 @@ class ApplicationWindow(QWidget):
         self.max_buffer_length = 5000 # How long we let the buffers get, helps with memory
         self.default_plot_length = 60 # Length of time (in sec) we plot before you have to scroll back to see it
         self.init_data_buffer()
-        
-        # Create the three main GUI panels:
 
-        # 1. Top left panel: sensor status and control
-        left_widget = QWidget(self)
-        left_widget.setLayout(self.build_control_layout(QGridLayout()))
-
-        # 2. Top right panel: plots
-        right_widget = QWidget(self)
-        right_widget.setLayout(self.build_plotting_layout(QVBoxLayout()))
-
-        # 3. Bottom panel: pneumatic layout
+        # Pneumatic grid variables
         self.buttons_locked = True
         self.num_buttons = 24
         self.pneumatic_grid_buttons = []
         self.pneumatic_autonomous_controls = []
-        bottom_widget = QWidget(self)
-        bottom_widget.setMinimumHeight(int(self.height()/2))
-        bottom_widget.setLayout(self.build_pneumatic_layout(QHBoxLayout()))
         
-
+        # Create the main GUI panels
+        # We can arrange things in a QGridLayout by specifying (row, column, rowspan, columnspan)
         main_layout = QGridLayout()
-        main_layout.addWidget(left_widget, 0, 0)
-        main_layout.addWidget(right_widget, 0, 1)
-        main_layout.addWidget(bottom_widget, 1, 0, 1, 2)
+        main_layout.addLayout(self.build_status_layout(), 2, 0)
+        main_layout.addLayout(self.build_control_layout(), 0, 0)
+        main_layout.addLayout(self.build_pneum_ctrl_layout(), 1, 0)
+        main_layout.addLayout(self.build_plotting_layout(), 0, 1, 1, 2)
+        main_layout.addLayout(self.build_pneumatic_layout(), 1, 1, 2, 2)
         self.setLayout(main_layout)
         
         # Create a threadpool for this class, so we can do threading later
@@ -200,27 +190,24 @@ class ApplicationWindow(QWidget):
 
     ## --------------------- SENSOR STATUS & CONTROL --------------------- ## 
        
-    def build_control_layout(self, left_layout:QGridLayout):
-        """Method to build the layout for sensor status & control
-
-        Args:
-            left_layout (QLayout): The layout we want to store our status & control widgets in
-        """
-        left_layout.setContentsMargins(0, 20, 10, 0)
+    def build_control_layout(self):
+        """Method to build the layout for sensor status & control"""
+        control_layout = QGridLayout()
+        control_layout.setContentsMargins(0, 20, 10, 0)
         # Initialize variables to store sensor control parameters, like temperature and pressure setpoint
         self.init_sensor_control_params()
         # Grab button information for both the main title array and the individual sensors
         title_button_info, sensor_button_info, control_button_info = self.define_sensor_button_callbacks()
         # Make the title row - has general buttons for initializing sensors and starting data collection
-        start_next_row, title_colspan = self.make_title_control_panel(left_layout, title_button_info)
+        start_next_row, title_colspan = self.make_title_control_panel(control_layout, title_button_info)
         # Make the individual button rows
-        self.make_sensor_control_panel(left_layout, sensor_button_info, control_button_info, starting_row=start_next_row, colspan=title_colspan)
+        self.make_sensor_control_panel(control_layout, sensor_button_info, control_button_info, starting_row=start_next_row, colspan=title_colspan)
         # Position the panel at the top of the window and make it stretchy
-        left_layout.setAlignment(QtCore.Qt.AlignTop)
+        control_layout.setAlignment(QtCore.Qt.AlignTop)
         for i in range(title_colspan):
-            left_layout.setColumnStretch(i, 1)
+            control_layout.setColumnStretch(i, 1)
 
-        return left_layout
+        return control_layout
     
     def init_sensor_control_params(self):
         """Method to initialize dictionaries to hold sensor control information, namely their status and setpoint control values
@@ -260,6 +247,7 @@ class ApplicationWindow(QWidget):
         # Set the title
         label = QLabel(self)
         label.setText("Sensor Status & Control")
+        label.setMinimumWidth(int(self.width()/3))
         label.setFont(self.bold16)
         label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
         parent.addWidget(label, 0, 0, 1, colspan) # args: widget, row, column, rowspan, columnspan
@@ -670,102 +658,51 @@ class ApplicationWindow(QWidget):
 
     ## --------------------- PNEUMATIC GRID --------------------- ##
 
-    def build_pneumatic_layout(self, bottom_layout:QHBoxLayout):
+    def build_pneumatic_layout(self):  
 
-        # left        
-        pneum_control_frame = self.make_pneumatic_control()
-
-        # middle
-        pneum_grid = QGridLayout()
-        line = QFrame(self)
-        line.setFrameShape(QFrame.VLine)
-        pneum_grid.addWidget(line, 0, 0, 4, 1)
+        pneumatic_layout = QGridLayout()
 
         label = self.default_label("Pneumatic Grid", self.bold16)
-        pneum_grid.addWidget(label, 0, 1)
+        pneumatic_layout.addWidget(label, 0, 1)
+
+        line = self.dividing_line(QFrame.VLine)
+        pneumatic_layout.addWidget(line, 0, 0, 4, 1)
                              
         pneum_widget = self.make_pneumatic_button_grid()
-        pneum_grid.addWidget(pneum_widget, 1, 1)
+        pneumatic_layout.addWidget(pneum_widget, 1, 1)
 
         button = self.default_button("Edit Button Layout", self.norm12, self._on_edit_pneumatic_buttons)
-        pneum_grid.addWidget(button, 3, 1, alignment=Qt.AlignBottom|Qt.AlignRight)
+        pneumatic_layout.addWidget(button, 3, 1, alignment=Qt.AlignBottom|Qt.AlignRight)
 
-        line = QFrame(self)
-        line.setFrameShape(QFrame.VLine)
-        pneum_grid.addWidget(line, 0, 2, 4, 1)
-        
-        # right
-        # status bar
-        status_panel = QVBoxLayout()
+        line = self.dividing_line(QFrame.VLine)
+        pneumatic_layout.addWidget(line, 0, 2, 4, 1)
 
-        label = self.default_label("Status", self.bold16)
-        status_panel.addWidget(label)
-
-        list_widget = QTextEdit(self)
-        list_widget.setMaximumHeight(int(pneum_widget.height()*0.75))
-
-        handler = GUIHandler(list_widget, level=logging.DEBUG)
-        logger.addHandler(handler)
-        formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(name)s:  %(message)s", datefmt="%H:%M:%S")
-        handler.setFormatter(formatter)
-
-        logger.info("Getting logger {0} - {1}".format(id(logger), logger.handlers))
-        logger.debug("This is normal text")
-        logger.warning("Watch out")
-        logger.error("Something has gone wrong")
-        logger.critical("Oh god everything is broken")
-        # Add some items to the list
-        # for i in range(20):
-        #     list_widget.addItem(f"Item {i}")
-            # Create a scrollbar and connect it to the list
-        
-        # scrollbar = QScrollBar(self)
-        # scrollbar.setMaximum(list_widget.count())
-        # scrollbar.sliderMoved.connect(list_widget.setCurrentRow)
-
-        status_panel.addWidget(list_widget, alignment=Qt.AlignTop)
-        # status_panel.addWidget(scrollbar)
-
-
-        # status_panel.setAlignment(QtCore.Qt.AlignTop)
-
-        bottom_layout.addLayout(pneum_control_frame)
-        bottom_layout.addLayout(pneum_grid)
-        bottom_layout.addLayout(status_panel)
-
-        return bottom_layout
+        return pneumatic_layout
     
-    def make_pneumatic_control(self):
-        pneum_control_frame = QVBoxLayout()
+    def build_pneum_ctrl_layout(self):
+        pneum_control_layout = QVBoxLayout()
 
-        label = self.default_label("Control Method", self.bold16)
-        pneum_control_frame.addWidget(label)
+        label = self.default_label("Pneumatic Valve Control", self.bold12)
+        pneum_control_layout.addWidget(label)
 
-        label = self.default_label("Manual Valve Controls", self.norm12)
-        pneum_control_frame.addWidget(label)
+        label = self.default_label("Manual Valve Lockout", self.norm12)
+        pneum_control_layout.addWidget(label)
 
         button = self.default_button(callback=self._on_manual_valve_control, requires_self=True)
         button.setCheckable(True)
         button.setStyleSheet("background-color : green")
         button.setFixedWidth(int(label.width() * 1.5))
-        pneum_control_frame.addWidget(button, alignment=QtCore.Qt.AlignHCenter)
-
-        line = self.dividing_line()
-        pneum_control_frame.addWidget(line)
+        pneum_control_layout.addWidget(button, alignment=QtCore.Qt.AlignHCenter)
 
         label = self.default_label("Automation Routine", self.norm12)
-        pneum_control_frame.addWidget(label)
+        pneum_control_layout.addWidget(label)
 
         dropdown = QComboBox()
         dropdown.addItems(['One', 'Two', 'Three', 'Four']) # Replace with automation routines
         dropdown.setDisabled(True)
         dropdown.setFont(self.norm10)
         self.pneumatic_autonomous_controls.append(dropdown)
-        pneum_control_frame.addWidget(dropdown)
-
-        line = QFrame(self)
-        line.setFrameShape(QFrame.HLine)
-        pneum_control_frame.addWidget(line)
+        pneum_control_layout.addWidget(dropdown)
 
         buttons_layout = QHBoxLayout()
 
@@ -782,14 +719,18 @@ class ApplicationWindow(QWidget):
         button = self.default_button(callback=partial(self._on_stop_autonomous, dropdown), enabled=False)
         button.setIcon(QIcon("doc/imgs/stop.png"))
         self.pneumatic_autonomous_controls.append(button)
-        buttons_layout.addWidget(button) 
+        buttons_layout.addWidget(button)
 
-        pneum_control_frame.addLayout(buttons_layout)
+        pneum_control_layout.addLayout(buttons_layout)
+
+        for _ in range(2):
+            line = self.dividing_line()
+            pneum_control_layout.addWidget(line) 
 
         # Position the widgets at the top of the layout
-        pneum_control_frame.setAlignment(QtCore.Qt.AlignTop)
+        pneum_control_layout.setAlignment(QtCore.Qt.AlignTop)
 
-        return pneum_control_frame
+        return pneum_control_layout
 
 
     def make_pneumatic_button_grid(self):
@@ -882,25 +823,48 @@ class ApplicationWindow(QWidget):
         with open("config/button_locs.yaml", "w") as yaml_file:
             yaml.dump(button_loc_dic, yaml_file, sort_keys=False)
             
-    
+    ## --------------------- STATUS PANEL --------------------- ##
+
+    def build_status_layout(self):
+        status_panel = QVBoxLayout()
+
+        label = self.default_label("Status & Logs", self.bold16)
+        status_panel.addWidget(label)
+
+        list_widget = QTextEdit(self)
+        # list_widget.setMaximumHeight(int(pneum_widget.height()*0.75))
+
+        handler = GUIHandler(list_widget, level=logging.DEBUG)
+        logger.addHandler(handler)
+        formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(name)s:  %(message)s", datefmt="%H:%M:%S")
+        handler.setFormatter(formatter)
+
+        logger.info("Getting logger {0} - {1}".format(id(logger), logger.handlers))
+        logger.debug("This is normal text")
+        logger.warning("Watch out")
+        logger.error("Something has gone wrong")
+        logger.critical("Oh god everything is broken")
+
+        status_panel.addWidget(list_widget, alignment=Qt.AlignTop)
+
+        return status_panel
+
     ## --------------------- DATA STREAMING / LIVE PLOTTING --------------------- ##
 
-    def build_plotting_layout(self, center_layout:QLayout):
+    def build_plotting_layout(self):
         """
-        A method to build the central plotting panel. Takes in the parent layout (center_layout) and adds a QTabWidget
-        to give us a convienent way to display the live sensor plots. For each sensor (stored in self.sensor_names), we add a tab
-        to hold the matplotlib figure and toolbar that will display sensor data.
-
-        Args:
-            center_layout (QLayout): The main window layout we want to nest the plots in
+        A method to build the central plotting panel. Uses a QTabWidget to give us a conveinent way to display 
+        the live sensor plots. For each sensor (stored in self.sensor_names), we add a tab to hold the 
+        matplotlib figure and toolbar that will display sensor data.
         """
-        # center_layout.setContentsMargins(10, 20, 10, 0)
+        plotting_layout = QVBoxLayout()
+        # plotting_layout.setContentsMargins(10, 20, 10, 0)
         # Make a title
         label = QLabel(self)
         label.setText("Live Sensor Data")
         label.setFont(self.bold16)
         label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        center_layout.addWidget(label)
+        plotting_layout.addWidget(label)
 
         # Initialize the plotting flag
         self.data_collection = False
@@ -940,9 +904,9 @@ class ApplicationWindow(QWidget):
             # Hold onto the figure object for later
             self.plot_figs.update({sensor: fig})
         # Once we've done all that, add the QTabWidget to the main layout
-        center_layout.addWidget(self.plot_tab)
+        plotting_layout.addWidget(self.plot_tab)
 
-        return center_layout
+        return plotting_layout
 
     def _thread_plots(self):
         """Method to update the live plots with the buffers stored in self.big_data_dict
