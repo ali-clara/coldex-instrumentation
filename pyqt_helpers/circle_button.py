@@ -20,7 +20,6 @@ class CircleButton(QPushButton):
         self.ducklings = ducklings
         self.init_button_position(start_pos)
         
-
         ### ----- colors ----- ###
         closed_light = QColor(247, 217, 126, 255)
         closed_mid = QColor(255, 193, 7, 255)
@@ -104,6 +103,18 @@ class CircleButton(QPushButton):
             self.button_open = True
         else:
             self.button_open = False
+
+    def get_state(self) -> str:
+        if self.button_open:
+            return "OPEN"
+        else:
+            return "CLOSED"
+        
+    def is_open(self):
+        if self.button_open:
+            return True
+        else:
+            return False
 
     def lock_button_movement(self):
         self.button_locked = True

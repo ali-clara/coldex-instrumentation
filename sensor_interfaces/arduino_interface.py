@@ -93,7 +93,16 @@ class ArduinoInterface():
             msg_str = self.start_character+command+self.end_character
             self.ser.write(str(msg_str).encode())
             self.query()
-            logger.info(f"Sent command to Arduino: {command}")
+            logger.debug(f"Sent command to Arduino: {command}")
         else:
-            logger.info(f"Invalid Arduino command: {command}")
+            logger.debug(f"Invalid Arduino command: {command}")
 
+    def set_pin_high(self, pin:str):
+        logger.info(f"Setting pin {pin} high")
+        msg_str = "01;"+pin
+        self.send_command(msg_str)
+
+    def set_pin_low(self, pin:str):
+        logger.info(f"Setting pin {pin} low")
+        msg_str = "00;"+pin
+        self.send_command(msg_str)

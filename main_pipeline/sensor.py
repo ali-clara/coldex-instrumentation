@@ -81,7 +81,6 @@ class Sensor():
     def __del__(self):
         self.shutdown_sensors()
 
-
     @log_on_start(logging.INFO, "Initializing sensors", logger=logger)
     @log_on_end(logging.INFO, "Finished initializing sensors", logger=logger)
     def initialize_sensors(self):

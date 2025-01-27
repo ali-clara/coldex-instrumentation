@@ -741,8 +741,8 @@ class ApplicationWindow(QWidget):
         with open("config/button_locs.yaml", "r") as stream:
             button_locs = yaml.safe_load(stream)
 
-        def yey(button_num):
-            logger.info(f"button {button_num} clicked")
+        def yey(button:CircleButton):
+            logger.info(f"button {button.text()} set to {button.get_state()}")
 
         for i in range(1, self.num_buttons+1):
             start_pos = (button_locs[f"button {i}"]["x"], button_locs[f"button {i}"]["y"])
@@ -750,7 +750,7 @@ class ApplicationWindow(QWidget):
             button.setText(str(i))
             button.setFont(self.norm12)
             self.pneumatic_grid_buttons.append(button)
-            button.clicked.connect(partial(yey, i))
+            button.clicked.connect(partial(self._on_push_pneumatic_button, button))
 
         return parent_widget
     
@@ -769,7 +769,16 @@ class ApplicationWindow(QWidget):
 
         self.button_edit_window.show()
 
-    
+    def _on_push_pneumatic_button(self, button:CircleButton):
+        button_num = button.text()
+        if len(button_num) == 1:
+            button_num = "0"+button_num
+        logger.info(f"button {button_num} set to {button.get_state()}")
+        if button.is_open():
+            self.sensor.arduino.set_pin_high(button_num)
+        else:
+            self.sensor.arduino.set_pin_low(button_num)
+
     def _on_manual_valve_control(self, button:QPushButton):
         # If button is checked
         if button.isChecked():
@@ -838,6 +847,7 @@ class ApplicationWindow(QWidget):
         logger.addHandler(handler)
         formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(name)s:  %(message)s", datefmt="%H:%M:%S")
         handler.setFormatter(formatter)
+        self.GUI_log_handler = handler
 
         logger.info("Getting logger {0} - {1}".format(id(logger), logger.handlers))
         logger.debug("This is normal text")

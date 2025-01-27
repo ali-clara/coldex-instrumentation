@@ -57,9 +57,21 @@ class ArduinoInterface():
     def validate_command(self, command):
         return True
 
-    @log_on_end(logging.INFO, "Sent command to arduino", logger=logger)
+    # @log_on_end(logging.INFO, "Sent command to arduino", logger=logger)
     def send_command(self, command):
         command_valid = self.validate_command(command)
         if command_valid:
-            logger.info(f"Sent command to Arduino: {command}")
+            logger.debug(f"Sent command to simulated Arduino: {command}")
+        else:
+            logger.debug(f"Invalid Arduino command: {command}")
+
+    def set_pin_high(self, pin:str):
+        logger.info(f"Setting pin {pin} high")
+        msg_str = "01;"+pin
+        self.send_command(msg_str)
+
+    def set_pin_low(self, pin:str):
+        logger.info(f"Setting pin {pin} low")
+        msg_str = "00;"+pin
+        self.send_command(msg_str)
 
