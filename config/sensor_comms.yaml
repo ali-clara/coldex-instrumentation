@@ -1,5 +1,5 @@
 # This file sets up configuration parameters for sensor communication, like serial ports and baud rates
 ---
 Arduino:
-  serial port: "COM9" # Nothing
+  serial port: "COM4" # lab
   baud rate: 19200

@@ -10,13 +10,13 @@ boolean newData = false;  // flag to keep track of if we have new data to proces
 
 #define pinLow 00
 #define pinHigh 01
-char delimiter = ";"
+char delimiter = ";";
 
 // Make sure the serial is set up
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(19200);
   while (!Serial); // Wait out until serial starts up
-  clearInputBuffer();
+  Serial.flush();
   delay(100);
 }
 
@@ -89,8 +89,8 @@ void parseCommands() {
     char * p_substring;
     // printf ("Splitting string \"%s\" into tokens:\n",receivedChars);
     p_substring = strtok(receivedChars, delimiter);
-    int command = strlen(p_substring[0])
-    int command_input = strlen(p_substring[1])
+    int command = strlen(p_substring[0]);
+    int command_input = strlen(p_substring[1]);
 
     // Loop through pch
     // while (p_substring != NULL)
@@ -113,13 +113,17 @@ void parseCommands() {
 }
 
 void setPinLow(int pin){
-  Serial.println("Setting pin low");
-  digitalWrite(pin, LOW)
+  Serial.print("Setting pin");
+  Serial.print(pin);
+  Serial.println("low");
+  digitalWrite(pin, LOW);
+  // Serial.println("blah");
+  Serial.println(digitalRead(pin));
 }
 
 void setPinHigh(int pin){
   Serial.println("Setting pin high");
-  digitalWrite(pin, HIGH)
+  digitalWrite(pin, HIGH);
 }
 
 void clearInputBuffer() {
