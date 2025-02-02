@@ -39,6 +39,7 @@ class CircleButton(QPushButton):
         self._mouse_press_pos = self.geometry().center() # Position of mouse click, initialized to reasonable QPoint
         self._mouse_move_pos = self.geometry().center() # Position of mouse movement, initialized to reasonable QPoint
         self.button_locked = locked  # Are we allowing the button to move
+        self.move_threshold = 3 #px
 
     def init_button_position(self, start_pos):
         start_pos = QPoint(int(start_pos[0]-self.radius/2), int(start_pos[1]-self.radius/2))
@@ -164,7 +165,7 @@ class CircleButton(QPushButton):
             # Call the parent class method
             super().mousePressEvent(event)
             # Change colors
-            self.change_button_state()
+            # self.change_button_state()
 
     def sizeHint(self):
         """Overwrites the QPushButton sizeHint method to hold the recommended size for the widget"""
@@ -270,17 +271,65 @@ class CircleButton(QPushButton):
     def mouseReleaseEvent(self, event:QMouseEvent):
         """Overwrites the QPushButton mouseReleaseEvent method. Ignores the button click if we've
         moved the button more than a threshold value"""
+        
         moved = event.globalPos() - self._mouse_press_pos 
-        move_threshold = 3
-        if moved.manhattanLength() > move_threshold:
-            self.change_button_state() # We didn't trigger a click, so internally change back to its original state
+        # If we've moved, we shouldn't click the button
+        if moved.manhattanLength() > self.move_threshold:
             event.ignore()
+        # If we haven't moved, we should click the button
         else:
+            self.change_button_state()
             super().mouseReleaseEvent(event)
-
     
-    def moveEvent(self, event:QMoveEvent):
+    def set_vert_geometry(self, child:VLine):
+        # Create a new geometry for the child object
+        new_geo = QRect()
+        # Set the left and right of the vertical rectangle - 
+            # The same as the button, offset by its thickness
+        child_thickness = child.geometry().width()
+        new_geo.setLeft(self.geometry().center().x() - int(child_thickness/2))
+        new_geo.setRight(self.geometry().center().x() + int(child_thickness/2))
+        # Set the top and bottom, depending on which side of the "baseline"
+            # the button is currently on
+        if child.geometry().bottom() > self.geometry().center().y():
+            new_geo.setTop(self.geometry().center().y())
+            new_geo.setBottom(child.baseline())
+        else:
+            new_geo.setBottom(self.geometry().center().y())
+            new_geo.setTop(child.baseline())
+        # Assign the child that new geometry
+        child.setGeometry(new_geo)
 
+    def set_hrz_geometry(self, child:HLine):
+        # Create a blank new geometry object
+        new_geo = QRect()
+        # Set the top and bottom of the horizontal rectangle - 
+            # The same as the button, offset by its thickness
+        child_thickness = child.geometry().height()
+        new_geo.setTop(self.geometry().center().y() - int(child_thickness/2))
+        new_geo.setBottom(self.geometry().center().y() + int(child_thickness/2))
+        # Set the left and right, depending on which side of the "baseline"
+            # the button is currently on
+        if child.geometry().right() > self.geometry().center().x():
+            new_geo.setLeft(self.geometry().center().x())
+            new_geo.setRight(child.baseline())
+        else:
+            new_geo.setRight(self.geometry().center().x())
+            new_geo.setLeft(child.baseline())
+
+        # Assign the child that new geometry
+        child.setGeometry(new_geo)
+    
+    def set_geometry_child(self, child:QFrame):
+        if child.frameShape() == QFrame.VLine:
+            self.set_vert_geometry(child)
+        elif child.frameShape() == QFrame.HLine:
+            self.set_hrz_geometry(child)
+        else:
+            print(f"Unknown child geometry")
+
+
+    def moveEvent(self, event:QMoveEvent):
         # Make sure the button is never moved outside of the parent object
         a0 = event.pos()
         if self.parentWidget() is not None:
@@ -296,22 +345,10 @@ class CircleButton(QPushButton):
 
         super().move(a0)
         
-        # move the child
+        # move each child object
         if self.ducklings is not None:
             for child in self.ducklings:
-                child_width = child.geometry().width()
-                # Create a new geometry for the child object
-                new_geo = QRect()
-                new_geo.setLeft(self.geometry().center().x() - int(child_width/2))
-                new_geo.setRight(self.geometry().center().x() + int(child_width/2))
-                if child.geometry().bottom() > self.geometry().center().y():
-                    new_geo.setTop(self.geometry().center().y())
-                    new_geo.setBottom(child.baseline())
-                else:
-                    new_geo.setBottom(self.geometry().center().y())
-                    new_geo.setTop(child.baseline())
-                # Assign the child that new geometry
-                child.setGeometry(new_geo)
+                self.set_geometry_child(child)
                     
         super().moveEvent(event)
 

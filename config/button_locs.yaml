@@ -1,6 +1,14 @@
+# All values in px
+
 button 1:
   x: 32
   y: 258
+  vlines:
+    baselines: [150]
+    thicknesses: [20]
+  hlines:
+    baselines: [150]
+    thicknesses: [20]
 button 2:
   x: 141
   y: 258
