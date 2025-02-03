@@ -291,14 +291,15 @@ class CircleButton(QPushButton):
         new_geo.setRight(self.geometry().center().x() + int(child_thickness/2))
         # Set the top and bottom, depending on which side of the "baseline"
             # the button is currently on
-        if child.geometry().bottom() > self.geometry().center().y():
+        if child.geometry().bottom() > (self.geometry().center().y() + 10):
             new_geo.setTop(self.geometry().center().y())
             new_geo.setBottom(child.baseline())
-        else:
+            child.setGeometry(new_geo)
+        elif child.geometry().bottom() < (self.geometry().center().y() + 10):
             new_geo.setBottom(self.geometry().center().y())
             new_geo.setTop(child.baseline())
         # Assign the child that new geometry
-        child.setGeometry(new_geo)
+            child.setGeometry(new_geo)
 
     def set_hrz_geometry(self, child:HLine):
         # Create a blank new geometry object
@@ -310,10 +311,10 @@ class CircleButton(QPushButton):
         new_geo.setBottom(self.geometry().center().y() + int(child_thickness/2))
         # Set the left and right, depending on which side of the "baseline"
             # the button is currently on
-        if child.geometry().right() > self.geometry().center().x():
+        if child.geometry().right() > (self.geometry().center().x() + 10):
             new_geo.setLeft(self.geometry().center().x())
             new_geo.setRight(child.baseline())
-        else:
+        elif child.geometry().right() < (self.geometry().center().x() + 10):
             new_geo.setRight(self.geometry().center().x())
             new_geo.setLeft(child.baseline())
 
@@ -343,12 +344,14 @@ class CircleButton(QPushButton):
             if self.geometry().bottom() >= self.parentWidget().size().height():
                 a0.setY(self.parentWidget().size().height() - self.radius)
 
-        super().move(a0)
+        
         
         # move each child object
         if self.ducklings is not None:
             for child in self.ducklings:
                 self.set_geometry_child(child)
+
+        super().move(a0)
                     
         super().moveEvent(event)
 
