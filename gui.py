@@ -29,7 +29,7 @@ from logdecorator import log_on_start , log_on_end , log_on_error
 from pyqt_helpers.live_plots import MyFigureCanvas
 from pyqt_helpers.circle_button import CircleButton
 from pyqt_helpers.custom_logging import GUIHandler
-from pyqt_helpers.lines import VLine
+from pyqt_helpers.lines import VLine, HLine
 from pyqt_helpers.helpers import epoch_to_pacific_time, find_grid_dims
 
 from main_pipeline.sensor import Sensor
@@ -741,12 +741,22 @@ class ApplicationWindow(QWidget):
         with open("config/button_locs.yaml", "r") as stream:
             button_locs = yaml.safe_load(stream)
 
-        def yey(button:CircleButton):
-            logger.info(f"button {button.text()} set to {button.get_state()}")
-
         for i in range(1, self.num_buttons+1):
             start_pos = (button_locs[f"button {i}"]["x"], button_locs[f"button {i}"]["y"])
-            button = CircleButton(radius=65, parent=parent_widget, start_pos=start_pos)
+
+            hrz_lines = button_locs[f"button {i}"]["hlines"]
+            vrt_lines = button_locs[f"button {i}"]["vlines"]
+
+            ducklings = []
+            for baseline, thickness in zip(vrt_lines["baselines"], vrt_lines["thicknesses"]):
+                line = VLine(parent_widget, baseline, thickness)
+                ducklings.append(line)
+
+            for baseline, thickness in zip(hrz_lines["baselines"], hrz_lines["thicknesses"]):
+                line = HLine(parent_widget, baseline, thickness)
+                ducklings.append(line)
+
+            button = CircleButton(radius=65, parent=parent_widget, start_pos=start_pos, ducklings=ducklings)
             button.setText(str(i))
             button.setFont(self.norm12)
             self.pneumatic_grid_buttons.append(button)

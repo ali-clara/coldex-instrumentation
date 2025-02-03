@@ -4,77 +4,215 @@ button 1:
   x: 32
   y: 258
   vlines:
-    baselines: [150]
+    baselines: [0]
     thicknesses: [20]
   hlines:
-    baselines: [150]
+    baselines: [0]
     thicknesses: [20]
 button 2:
   x: 141
   y: 258
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 3:
   x: 208
   y: 73
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 4:
   x: 308
   y: 73
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 5:
   x: 408
   y: 73
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 6:
   x: 208
   y: 443
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 7:
   x: 308
   y: 443
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 8:
   x: 408
   y: 443
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 9:
   x: 498
   y: 198
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 10:
   x: 498
   y: 296
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 11:
   x: 598
   y: 98
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 12:
   x: 698
   y: 98
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 13:
   x: 798
   y: 98
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 14:
   x: 874
   y: 223
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 15:
   x: 649
   y: 379
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 16:
   x: 724
   y: 379
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 17:
   x: 799
   y: 379
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 18:
   x: 874
   y: 379
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 19:
   x: 949
   y: 379
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 20:
   x: 1024
   y: 379
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 21:
   x: 1099
   y: 379
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 22:
   x: 888
   y: 500
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 23:
   x: 923
-  y: 501
+  y: 500
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
 button 24:
   x: 954
   y: 500
+  vlines:
+    baselines: [0]
+    thicknesses: [20]
+  hlines:
+    baselines: [0]
+    thicknesses: [20]
