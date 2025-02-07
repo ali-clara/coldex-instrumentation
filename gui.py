@@ -31,7 +31,7 @@ import csv
 from pyqt_helpers.live_plots import MyFigureCanvas
 from pyqt_helpers.circle_button import CircleButton
 from pyqt_helpers.custom_logging import GUIHandler
-from pyqt_helpers.lines import VLine
+from pyqt_helpers.lines import VLine, HLine
 from pyqt_helpers.helpers import *
 
 from main_pipeline.sensor import Sensor
@@ -102,8 +102,10 @@ class ApplicationWindow(QWidget):
         self.init_data_buffer()
 
         # Pneumatic grid variables
+        with open("config/button_locs.yaml", "r") as stream:
+            self.button_locs = yaml.safe_load(stream)
         self.buttons_locked = True
-        self.num_buttons = 24
+        self.num_buttons = len(self.button_locs)
         self.pneumatic_grid_buttons = []
         self.pneumatic_autonomous_controls = []
         
@@ -821,15 +823,30 @@ class ApplicationWindow(QWidget):
         parent_widget.setMinimumHeight(int(self.height()/2.25))
         parent_widget.setMinimumWidth(int(self.width()*0.6))
 
-        with open("config/button_locs.yaml", "r") as stream:
-            button_locs = yaml.safe_load(stream)
-
-        def yey(button:CircleButton):
-            logger.info(f"button {button.text()} set to {button.get_state()}")
-
         for i in range(1, self.num_buttons+1):
-            start_pos = (button_locs[f"button {i}"]["x"], button_locs[f"button {i}"]["y"])
-            button = CircleButton(radius=65, parent=parent_widget, start_pos=start_pos)
+            start_pos = (self.button_locs[f"button {i}"]["x"], self.button_locs[f"button {i}"]["y"])
+
+            hrz_lines = self.button_locs[f"button {i}"]["hlines"]
+            vrt_lines = self.button_locs[f"button {i}"]["vlines"]
+
+            ducklings = []
+            try:
+                for baseline, thickness in zip(vrt_lines["baselines"], vrt_lines["thicknesses"]):
+                    line = VLine(parent_widget, self.button_locs[f"button {i}"]["y"], baseline, thickness)
+                    line.lower()
+                    ducklings.append(line)
+            except TypeError:
+                pass
+
+            try:
+                for baseline, thickness in zip(hrz_lines["baselines"], hrz_lines["thicknesses"]):
+                    line = HLine(parent_widget, self.button_locs[f"button {i}"]["x"], baseline, thickness)
+                    line.lower()
+                    ducklings.append(line)
+            except TypeError:
+                pass
+
+            button = CircleButton(radius=65, parent=parent_widget, start_pos=start_pos, ducklings=ducklings)
             button.setText(str(i))
             button.setFont(self.norm12)
             self.pneumatic_grid_buttons.append(button)
@@ -907,13 +924,13 @@ class ApplicationWindow(QWidget):
                 self.buttons_locked = True
 
     def _save_pneumatic_button_positions(self):
-        button_loc_dic = {}
+        # button_loc_dic = {}
         for i, pneumatic_button in enumerate(self.pneumatic_grid_buttons, start=1):
-            button_loc_dic.update({f"button {i}": {"x":pneumatic_button.get_center()[0], 
-                                                "y":pneumatic_button.get_center()[1]}})
+            self.button_locs[f"button {i}"]["x"] = pneumatic_button.get_center()[0]
+            self.button_locs[f"button {i}"]["y"] = pneumatic_button.get_center()[1]
         
         with open("config/button_locs.yaml", "w") as yaml_file:
-            yaml.dump(button_loc_dic, yaml_file, sort_keys=False)
+            yaml.dump(self.button_locs, yaml_file, sort_keys=False)
             
     ## --------------------- STATUS PANEL --------------------- ##
 
