@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import csv
 
 ###################################### HELPER FUNCTIONS ######################################
 
@@ -35,7 +36,7 @@ def epoch_to_pacific_time(time, y_data=None):
         y_data (array_like): Can be an array of values or an array of arrays, either works
 
     Returns:
-        t_pacific (DateTimeIndex): Datetime object in pacific time
+        t_pacific (DateTimeIndex): Datetime object in pacific time (e.g 2014-08-01 09:00:00+02:00)
     """
     # Convert to numpy array
     time = np.array(time)
@@ -61,4 +62,34 @@ def epoch_to_pacific_time(time, y_data=None):
     # New timezone is pacific
     t_pacific = t_utc.tz_convert('America/Los_Angeles')
 
-    return t_pacific, y_data
+    if y_data is not None:
+        return t_pacific, y_data
+    else:
+        return t_pacific
+    
+
+def write_new_csv_header(filepath:str, header:list):
+    """Assumes the file does not exist. Probably put in a try-except block
+
+    Args:
+        filepath (str): _description_
+    """
+    with open(filepath, 'x') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(header)
+
+def overwrite_csv_dict(filepath:str, data:dict):
+    """_summary_
+
+    Args:
+        filepath (str): _description_
+        data (dict): _description_
+    """
+    with open(filepath, 'w') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=data.keys())
+        writer.writeheader()
+        writer.writerow(data)
+
+def append_csv_list(filepath:str, data:list):
+    pass
+        

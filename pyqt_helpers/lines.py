@@ -67,7 +67,7 @@ if __name__ == "__main__":
         line = HLine(widget, baseline, thickness)
         ducklings.append(line)
 
-    print(widget.geometry().size())
+    print(widget.geometry().size()) 
 
     button = CircleButton(50, 
                           widget, 
