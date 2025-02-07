@@ -91,6 +91,11 @@ class ApplicationWindow(QWidget):
         self.flask_n = 1
         self.metadata = None
 
+        self.data_dict = {
+            "all data": {},
+            "metadata": {},
+        }
+
         # Get today's date
         current_time = time.time()
         date = epoch_to_pacific_time(current_time).date
@@ -597,7 +602,10 @@ class ApplicationWindow(QWidget):
 
         # Check if data/YYMMDD/flaskN directory exists. I've split up the folders by flask, should check
         # and see if that's what they want to do
-        self.metadata = None
+
+        # self.metadata = None
+        self.metadata = {key:self.new_project_entries[key].text() for key in self.new_project_entries}
+        self.metadata.update({"Unix timestamp": time.time()})
 
         flask_n = self.new_project_entries["Flask"].text()
         current_data_dir = f"data/{self.date_str}/flask{flask_n}"
@@ -614,17 +622,20 @@ class ApplicationWindow(QWidget):
             "all data": f"{current_data_dir}/dataFull.csv",             ############################################# hardcode ##
             "metadata": f"{current_data_dir}/metadata.csv"
         }
+        self.data_dict["metadata"] = self.metadata
+
         # For each file we want to make...
         files_exist_flag = False
         for data in self.current_data_paths:
             path = self.current_data_paths[data]
             # Try to make it. If the filename exists, 'x' will raise a FileExistsError
             try:
-                write_new_csv_header(filepath=path, header=[])
+                write_new_csv_dict(path, self.data_dict[data])
             # If we find a file that exists already, break out of the loop and raise a message on the GUI
             except FileExistsError:
                 files_exist_flag = True
                 break
+
 
         # If we've found a file that exists already, prompt the user with a messagebox.
         if files_exist_flag:
@@ -638,8 +649,6 @@ class ApplicationWindow(QWidget):
             # If they accept the overwrite, 
             if msg_return == QMessageBox.Yes:
                 # overwrite metadata
-                self.metadata = {key:self.new_project_entries[key].text() for key in self.new_project_entries}
-                self.metadata.update({"Unix timestamp": time.time()})
                 overwrite_csv_dict(filepath=self.current_data_paths["metadata"], data=self.metadata)
             # Otherwise, exit the method without starting data collection or closing the new window
             elif msg_return == QMessageBox.No:

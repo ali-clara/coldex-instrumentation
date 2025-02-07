@@ -67,7 +67,6 @@ def epoch_to_pacific_time(time, y_data=None):
     else:
         return t_pacific
     
-
 def write_new_csv_header(filepath:str, header:list):
     """Assumes the file does not exist. Probably put in a try-except block
 
@@ -77,6 +76,13 @@ def write_new_csv_header(filepath:str, header:list):
     with open(filepath, 'x') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(header)
+
+def write_new_csv_dict(filepath:str, data:dict):
+    
+    with open(filepath, 'x') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=data.keys())
+        writer.writeheader()
+        writer.writerow(data)
 
 def overwrite_csv_dict(filepath:str, data:dict):
     """_summary_
