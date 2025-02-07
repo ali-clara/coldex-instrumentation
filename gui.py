@@ -606,6 +606,9 @@ class ApplicationWindow(QWidget):
         # self.metadata = None
         self.metadata = {key:self.new_project_entries[key].text() for key in self.new_project_entries}
         self.metadata.update({"Unix timestamp": time.time()})
+        
+        # this is somewhat clunky, but I don't have the brain power right now to make it cleaner. A problem for later
+        self.data_dict["metadata"] = self.metadata
 
         flask_n = self.new_project_entries["Flask"].text()
         current_data_dir = f"data/{self.date_str}/flask{flask_n}"
@@ -622,7 +625,6 @@ class ApplicationWindow(QWidget):
             "all data": f"{current_data_dir}/dataFull.csv",             ############################################# hardcode ##
             "metadata": f"{current_data_dir}/metadata.csv"
         }
-        self.data_dict["metadata"] = self.metadata
 
         # For each file we want to make...
         files_exist_flag = False
