@@ -18,6 +18,9 @@ import numpy as np
 import yaml
 import sys
 import time
+import multiprocessing
+import os
+import psutil
 from collections import deque
 from functools import partial
 import concurrent.futures
@@ -26,7 +29,6 @@ import pandas as pd
 import logging
 from logdecorator import log_on_start , log_on_end , log_on_error
 from pathlib import Path
-import csv
 
 from pyqt_helpers.live_plots import MyFigureCanvas
 from pyqt_helpers.circle_button import CircleButton
@@ -38,6 +40,8 @@ from main_pipeline.sensor import Sensor
 from main_pipeline.interpreter import Interpreter
 from main_pipeline.writer import Writer
 from main_pipeline.bus import Bus
+
+import automation_routines
 
 # Set up a logger for this module
 logger = logging.getLogger(__name__)
@@ -112,7 +116,7 @@ class ApplicationWindow(QWidget):
         self.buttons_locked = True
         self.num_buttons = len(self.button_locs)
         self.pneumatic_grid_buttons = []
-        self.pneumatic_autonomous_controls = []
+        self.pneumatic_autonomous_controls = {}
         
         # Create the main GUI panels
         # We can arrange things in a QGridLayout by specifying (row, column, rowspan, columnspan)
@@ -205,7 +209,6 @@ class ApplicationWindow(QWidget):
         dividing_line.setFrameShape(orientation)
         return dividing_line
         
-
     ## --------------------- SENSOR STATUS & CONTROL --------------------- ## 
        
     def build_control_layout(self):
@@ -496,12 +499,80 @@ class ApplicationWindow(QWidget):
         self.instrument_status_dict = instrument_status
         self.update_instrument_status()
     
+    def _on_stop_data(self):
+        """Callback function for the "Stop Data Collection" button. Sets the data_collection flag to false
+        """
+        self.data_collection = False
+        # self.title_buttons["Update Project"].setEnabled(False)
+
+    def _send_control_input(self, sensor:str, input_name:str, control_function):
+        """Method to grab the control input out of the self.sensor_control_inputs dictionary
+        and send it to the provided control function
+
+        Args:
+            sensor (str): The sensor name, must correspond to a key in self.big_data_dict
+            input_name (str): The name of the input parameter we're sending, must correspond to a key in self.sensor_control_inputs
+            control_function (method): The function in question
+        """
+        control_input = self.sensor_control_inputs[sensor][input_name]
+        control_function(control_input)
+
+    def _save_control_input(self, line:QLineEdit, sensor:str, input_name:str):
+        """Callback function for the QLineEdit entries, called whenever the user finishes editing them.
+
+        Args:
+            line (QLineEdit): The line entry in question
+            sensor (str): The sensor name, must correspond to a key in self.big_data_dict
+            input_name (str): The name of the input parameter we're sending, must correspond to a key in self.sensor_control_inputs
+        """
+        # Grab the current text of the line entry
+        current_input = line.text()
+        # Save the text to the correct key of the dictionary
+        self.sensor_control_inputs[sensor][input_name] = current_input
+        # Set the line text to reflect the new input, and clear the line
+        line.setPlaceholderText(f"{input_name}: {current_input}")
+        line.clear()
+
+    def update_instrument_status(self):
+        """Method to update the sensor status upon initialization or shutdown. Uses the values stored in
+        self.instrument_status_dict to set the color and text of each sensor status widget."""
+        # Loop through the sensors and grab their status from the sensor status dictionary
+        for name in self.instrument_names:
+            status = self.instrument_status_dict[name]
+            # If we're offline
+            if status == 0:
+                # color = "#D80F0F"
+                color = "#AF5189"
+                text = "OFFLINE"
+            # If we're online / successfully initialized
+            elif status == 1:
+                color = "#619CD2"
+                text = "ONLINE"
+            # If we're disconnected / using shadow hardware
+            elif status == 2:
+                color = "#FFC107"
+                text = "SHADOW HARDWARE"
+            # IF we failed initialization / there's some other error going on
+            elif status == 3:
+                color = "#D55E00"
+                text = "ERROR"
+            # If we recieved an erroneous reading, make it obvious
+            else:
+                color = "purple"
+                text = "?????"
+
+            # Update the sensor status accordingly
+            status = self.instrument_status_display[name] # This is a dictionary of QLabels
+            status.setText(text)
+            status.setStyleSheet(f"background-color:{color}; margin:10px")
+
+    ## --------------------- NEW/UPDATE PROJECT UI --------------------- ## 
     def _on_new_project(self):
         """Callback function for the "New Project" button. Pulls up a new window with a table to get
         metadata about the current project. Sets the data paths and files accordingly if the user
-        says "go", does nothing if the user says "cancel. See _on_start_data.
+        says "go", does nothing if the user says "cancel. See _on_start_project for more.
         """
-        start_button = self.default_button("Start", self.bold12, self._on_start_data)
+        start_button = self.default_button("Start", self.bold12, self._on_start_project)
         self._sample_data_UI(
                             window_title="New Sample Data", 
                             title="All fields are required", 
@@ -513,7 +584,7 @@ class ApplicationWindow(QWidget):
     def _on_update_project(self):
         """Callback function for the "Update Project" button. Pulls up the same window & table as 
         for "New Project" but with already-existing metadata, lets the user edit as they wish. 
-        See on_update_metadata
+        See on_update_metadata for more.
         """
         update_button = self.default_button("Update", self.bold12, self._on_update_metadata)
         self._sample_data_UI(
@@ -613,7 +684,7 @@ class ApplicationWindow(QWidget):
         self.new_project_window.setLayout(layout)
         self.new_project_window.show()
 
-    def _on_start_data(self):
+    def _on_start_project(self):
         """
         Callback function for the "Start" new project button. It grabs the new project metadata entries,
         creates a new directory and files based on the entries, and makes sure we don't overwrite
@@ -704,73 +775,6 @@ class ApplicationWindow(QWidget):
         self.data_dict["metadata"] = metadata
         # Close the window
         self.new_project_window.close()
-  
-    def _on_stop_data(self):
-        """Callback function for the "Stop Data Collection" button. Sets the data_collection flag to false
-        """
-        self.data_collection = False
-        # self.title_buttons["Update Project"].setEnabled(False)
-
-    def _send_control_input(self, sensor:str, input_name:str, control_function):
-        """Method to grab the control input out of the self.sensor_control_inputs dictionary
-        and send it to the provided control function
-
-        Args:
-            sensor (str): The sensor name, must correspond to a key in self.big_data_dict
-            input_name (str): The name of the input parameter we're sending, must correspond to a key in self.sensor_control_inputs
-            control_function (method): The function in question
-        """
-        control_input = self.sensor_control_inputs[sensor][input_name]
-        control_function(control_input)
-
-    def _save_control_input(self, line:QLineEdit, sensor:str, input_name:str):
-        """Callback function for the QLineEdit entries, called whenever the user finishes editing them.
-
-        Args:
-            line (QLineEdit): The line entry in question
-            sensor (str): The sensor name, must correspond to a key in self.big_data_dict
-            input_name (str): The name of the input parameter we're sending, must correspond to a key in self.sensor_control_inputs
-        """
-        # Grab the current text of the line entry
-        current_input = line.text()
-        # Save the text to the correct key of the dictionary
-        self.sensor_control_inputs[sensor][input_name] = current_input
-        # Set the line text to reflect the new input, and clear the line
-        line.setPlaceholderText(f"{input_name}: {current_input}")
-        line.clear()
-
-    def update_instrument_status(self):
-        """Method to update the sensor status upon initialization or shutdown. Uses the values stored in
-        self.instrument_status_dict to set the color and text of each sensor status widget."""
-        # Loop through the sensors and grab their status from the sensor status dictionary
-        for name in self.instrument_names:
-            status = self.instrument_status_dict[name]
-            # If we're offline
-            if status == 0:
-                # color = "#D80F0F"
-                color = "#AF5189"
-                text = "OFFLINE"
-            # If we're online / successfully initialized
-            elif status == 1:
-                color = "#619CD2"
-                text = "ONLINE"
-            # If we're disconnected / using shadow hardware
-            elif status == 2:
-                color = "#FFC107"
-                text = "SHADOW HARDWARE"
-            # IF we failed initialization / there's some other error going on
-            elif status == 3:
-                color = "#D55E00"
-                text = "ERROR"
-            # If we recieved an erroneous reading, make it obvious
-            else:
-                color = "purple"
-                text = "?????"
-
-            # Update the sensor status accordingly
-            status = self.instrument_status_display[name] # This is a dictionary of QLabels
-            status.setText(text)
-            status.setStyleSheet(f"background-color:{color}; margin:10px")
 
     ## --------------------- PNEUMATIC GRID --------------------- ##
 
@@ -794,47 +798,50 @@ class ApplicationWindow(QWidget):
         pneumatic_layout.addWidget(line, 0, 2, 4, 1)
 
         return pneumatic_layout
+       
     
     def build_pneum_ctrl_layout(self):
         pneum_control_layout = QVBoxLayout()
 
+        # Layout title
         label = self.default_label("Pneumatic Valve Control", self.bold12)
         pneum_control_layout.addWidget(label)
-
+        # Button to toggle manual/autonomous pneumatic valve mode control
         label = self.default_label("Manual Valve Lockout", self.norm12)
         pneum_control_layout.addWidget(label)
-
         button = self.default_button(callback=self._on_manual_valve_control, requires_self=True)
         button.setCheckable(True)
         button.setStyleSheet("background-color : green")
         button.setFixedWidth(int(label.width() * 1.5))
         pneum_control_layout.addWidget(button, alignment=QtCore.Qt.AlignHCenter)
+        # Combobox to set automation routine
+        
+        self.auto_routine_dict = automation_routines.get_automation_routines()
 
         label = self.default_label("Automation Routine", self.norm12)
         pneum_control_layout.addWidget(label)
-
         dropdown = QComboBox()
-        dropdown.addItems(['One', 'Two', 'Three', 'Four']) # Replace with automation routines
+        dropdown.addItems(self.auto_routine_dict.keys())
         dropdown.setDisabled(True)
         dropdown.setFont(self.norm10)
-        self.pneumatic_autonomous_controls.append(dropdown)
+        self.pneumatic_autonomous_controls.update({"dropdown":dropdown})
         pneum_control_layout.addWidget(dropdown)
 
         buttons_layout = QHBoxLayout()
 
         button = self.default_button(callback=partial(self._on_start_autonomous, dropdown), enabled=False)
         button.setIcon(QIcon("doc/imgs/play.png"))
-        self.pneumatic_autonomous_controls.append(button)
+        self.pneumatic_autonomous_controls.update({"start":button})
         buttons_layout.addWidget(button) 
 
         button = self.default_button(callback=partial(self._on_pause_autonomous, dropdown), enabled=False)
         button.setIcon(QIcon("doc/imgs/pause.png"))
-        self.pneumatic_autonomous_controls.append(button)
-        buttons_layout.addWidget(button) 
+        self.pneumatic_autonomous_controls.update({"pause":button})
+        buttons_layout.addWidget(button)
 
         button = self.default_button(callback=partial(self._on_stop_autonomous, dropdown), enabled=False)
         button.setIcon(QIcon("doc/imgs/stop.png"))
-        self.pneumatic_autonomous_controls.append(button)
+        self.pneumatic_autonomous_controls.update({"stop":button})
         buttons_layout.addWidget(button)
 
         pneum_control_layout.addLayout(buttons_layout)
@@ -847,7 +854,6 @@ class ApplicationWindow(QWidget):
         pneum_control_layout.setAlignment(QtCore.Qt.AlignTop)
 
         return pneum_control_layout
-
 
     def make_pneumatic_button_grid(self):
         parent_widget = QWidget()
@@ -917,7 +923,7 @@ class ApplicationWindow(QWidget):
             for pneumatic_button in self.pneumatic_grid_buttons:
                 pneumatic_button.setDisabled(True)
             for control in self.pneumatic_autonomous_controls:
-                control.setEnabled(True)
+                self.pneumatic_autonomous_controls[control].setEnabled(True)
             # button.setText("Click for manual valve controls")
             # label.setText("Valve Controls: Autonomous")
         # If button is unchecked
@@ -926,21 +932,63 @@ class ApplicationWindow(QWidget):
             for pneumatic_button in self.pneumatic_grid_buttons:
                 pneumatic_button.setEnabled(True)
             for control in self.pneumatic_autonomous_controls:
-                control.setDisabled(True)
+                self.pneumatic_autonomous_controls[control].setDisabled(True)
             # button.setText("Click for autonomous valve controls")
             # label.setText("Valve Controls: Manual")
 
     def _on_start_autonomous(self, routine_select:QComboBox):
         routine_name = routine_select.currentText()
-        print(f"start autonomous mode: {routine_name}")
+        logger.info(f"Starting autonomous routine: {routine_name}")
+        
+        try:
+            status = self.p.status()
+            print(status)
+        # we have not yet started - self.p doesn't exist
+        except:
+            pid = os.getpid()
+            self.mp = multiprocessing.Process(target=self.auto_routine_dict[routine_name].run)
+            self.mp.start()
+            self.p = psutil.Process(self.mp.pid)
+        # we have started - self.p does exist
+        else:
+            if status == "stopped": # we're suspended
+                self.p.resume()
+            elif status == "sleeping" or status == "running": # we're running
+                pass 
+            else:
+                logger.warning(f"Unknown process status: {status}")
+
+        # worker = Worker(self.auto_routine_dict[routine_name].run)
+        # self.threadpool.start(worker)
+
+        self.pneumatic_autonomous_controls["start"].setDisabled(True)
+        self.pneumatic_autonomous_controls["pause"].setEnabled(True)
+        self.pneumatic_autonomous_controls["stop"].setEnabled(True)
 
     def _on_pause_autonomous(self, routine_select:QComboBox):
         routine_name = routine_select.currentText()
-        print(f"pause autonomous mode: {routine_name}")
+        logger.info(f"Pausing autonomous routine: {routine_name}")
+
+        self.p.suspend()
+
+        # self.auto_routine_dict[routine_name].pause()
+
+        self.pneumatic_autonomous_controls["start"].setEnabled(True)
 
     def _on_stop_autonomous(self, routine_select:QComboBox):
         routine_name = routine_select.currentText()
-        print(f"stop autonomous mode: {routine_name}")
+        logger.info(f"Stopping autonomous routine: {routine_name}")
+
+        
+        if self.mp.is_alive():
+            self.p.kill()
+            self.mp.terminate()
+            self.mp.join()
+        # self.auto_routine_dict[routine_name].stop()
+
+        self.pneumatic_autonomous_controls["start"].setEnabled(True)
+        self.pneumatic_autonomous_controls["pause"].setDisabled(True)
+        self.pneumatic_autonomous_controls["stop"].setDisabled(True)
 
     def _control_pneumatic_button_movement(self, control_button:QPushButton):
         if self.pneumatic_grid_buttons[0].button_locked:
