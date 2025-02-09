@@ -496,21 +496,39 @@ class ApplicationWindow(QWidget):
         self.instrument_status_dict = instrument_status
         self.update_instrument_status()
     
-    def _on_update_project(self):
-        update_button = self.default_button("Update", self.bold12, self._on_update_metadata)
-        self._sample_data_UI("Update Sample Data", "Watch out! Anything you enter overwrites existing metadata.", update_button)
-
     def _on_new_project(self):
-        #### reset status logs, start new data file
+        """Callback function for the "New Project" button. Pulls up a new window with a table to get
+        metadata about the current project. Sets the data paths and files accordingly if the user
+        says "go", does nothing if the user says "cancel. See _on_start_data.
+        """
         start_button = self.default_button("Start", self.bold12, self._on_start_data)
-        self._sample_data_UI("New Sample Data", "All fields are required", start_button)
+        self._sample_data_UI(
+                            window_title="New Sample Data", 
+                            title="All fields are required", 
+                            enter_button=start_button,
+                            use_case="new")
 
-    def _sample_data_UI(self, window_title:str, title:str, enter_button:QPushButton):
+        #### reset status logs ?
+    
+    def _on_update_project(self):
+        """Callback function for the "Update Project" button. Pulls up the same window & table as 
+        for "New Project" but with already-existing metadata, lets the user edit as they wish. 
+        See on_update_metadata
+        """
+        update_button = self.default_button("Update", self.bold12, self._on_update_metadata)
+        self._sample_data_UI(
+                            title="Update Sample Data", 
+                            window_title="Watch out! Anything you enter overwrites existing metadata.", 
+                            enter_button=update_button,
+                            use_case="update")
+
+    def _sample_data_UI(self, window_title:str, title:str, enter_button:QPushButton, use_case:str):
         """Long but fairly straightforward! Method that builds the layout for the "New Project" and "Update Project" buttons. 
         Creates a user-entry grid based on the entries set in project_metadata.yaml.
 
         Args:
-            title (str): Window title
+            window_title (str): Window title
+            title (str): Top-of-page label
             enter_button (QPushButton): The "enter" button (complete with callback) - since I use this method for both new and update, 
                 I want "enter" to do different things
         """
@@ -527,6 +545,7 @@ class ApplicationWindow(QWidget):
         metadata_layout.addWidget(self.dividing_line(QFrame.VLine))
         # For each piece of data to collect, add a text entry
         user_metadata = self.metadata_dict["New project"]["User metadata"]
+        metadata = self.data_dict["metadata"]
         self.new_project_entries = {}
         for data in user_metadata:
             # First widget - label
@@ -534,8 +553,9 @@ class ApplicationWindow(QWidget):
             metadata_layout.addWidget(label)
             # Second widget - text entry box
             entry = QLineEdit(self)
-            if self.metadata is not None:
-                entry.setText(self.metadata[data])
+            # if len(metadata) > 0:# is not None:
+            if use_case == "update" and len(metadata) > 0:
+                entry.setText(metadata[data])
             metadata_layout.addWidget(entry)
             # Hang onto the text entry box widget for later
             self.new_project_entries.update({data: entry})
@@ -554,6 +574,7 @@ class ApplicationWindow(QWidget):
         widgets_per_col = 2
         sample_data = self.metadata_dict["New project"]["Sample data"]
         sample_rows, sample_cols = find_grid_dims(len(sample_data), len(sample_data)*widgets_per_col)
+        metadata = self.data_dict["metadata"]
         i = 0
         for row in range(0, sample_rows):
             for col in range(1, sample_cols+1, widgets_per_col):
@@ -565,8 +586,8 @@ class ApplicationWindow(QWidget):
                 entry = QLineEdit(self)
                 if label.text() == "Flask":
                     entry.setText(str(self.flask_n))
-                if self.metadata is not None:
-                    entry.setText(self.metadata[data])
+                if use_case == "update " and len(metadata) > 0: # is not None:
+                    entry.setText(metadata[data])
                 sample_layout.addWidget(entry, row+1, col)
                 # Again, hang onto the data entry
                 self.new_project_entries.update({data: entry})
@@ -585,7 +606,6 @@ class ApplicationWindow(QWidget):
                                 alignment = Qt.AlignRight)
         button_layout.addWidget(self.default_button("Cancel", self.bold12, self.new_project_window.close), 
                                 alignment=Qt.AlignLeft)
-
         button_layout.setAlignment(Qt.AlignVCenter | Qt.AlignBottom)
         layout.addLayout(button_layout, stretch=1)
 
@@ -594,22 +614,17 @@ class ApplicationWindow(QWidget):
         self.new_project_window.show()
 
     def _on_start_data(self):
-        ########################## EVENTUALLY THIS WILL BE THE FINAL VERSION, but I don't want to enter all the fields every time I debug ##########################
-        # for key in self.new_project_entries:
-        #     if self.new_project_entries[key].text() == "":
-        #         self.new_project_window.setWindowTitle(f"All fields are required - {key} was left blank. Please try again")
-        #         return
+        """
+        Callback function for the "Start" new project button. It grabs the new project metadata entries,
+        creates a new directory and files based on the entries, and makes sure we don't overwrite
+        anything without express user permission.
+        """
+        # Get project metadata, adding our own internal timestamp
+        metadata = {key:self.new_project_entries[key].text() for key in self.new_project_entries}
+        metadata.update({"Unix timestamp": time.time()})
 
         # Check if data/YYMMDD/flaskN directory exists. I've split up the folders by flask, should check
         # and see if that's what they want to do
-
-        # self.metadata = None
-        self.metadata = {key:self.new_project_entries[key].text() for key in self.new_project_entries}
-        self.metadata.update({"Unix timestamp": time.time()})
-        
-        # this is somewhat clunky, but I don't have the brain power right now to make it cleaner. A problem for later
-        self.data_dict["metadata"] = self.metadata
-
         flask_n = self.new_project_entries["Flask"].text()
         current_data_dir = f"data/{self.date_str}/flask{flask_n}"
         # If it does, fabulous
@@ -620,12 +635,11 @@ class ApplicationWindow(QWidget):
             logger.info(f"Making directory {current_data_dir}")
             Path(current_data_dir).mkdir(parents=True)
 
-        # Create our data files, making sure we don't overwrite anything 
+        # Now that we've established the correct directory, create our data filepaths
         self.current_data_paths = {
-            "all data": f"{current_data_dir}/dataFull.csv",             ############################################# hardcode ##
+            "all data": f"{current_data_dir}/dataFull.csv",             ############################################# hardcode alert ##
             "metadata": f"{current_data_dir}/metadata.csv"
         }
-
         # For each file we want to make...
         files_exist_flag = False
         for data in self.current_data_paths:
@@ -633,12 +647,10 @@ class ApplicationWindow(QWidget):
             # Try to make it. If the filename exists, 'x' will raise a FileExistsError
             try:
                 write_new_csv_dict(path, self.data_dict[data])
-            # If we find a file that exists already, break out of the loop and raise a message on the GUI
+            # If we find a file that exists already, note that and break out of the loop
             except FileExistsError:
                 files_exist_flag = True
                 break
-
-
         # If we've found a file that exists already, prompt the user with a messagebox.
         if files_exist_flag:
             ask = QMessageBox()
@@ -646,50 +658,58 @@ class ApplicationWindow(QWidget):
             ask.setText(f"Files with this flask number (Flask {flask_n}) exist already. Overwrite metadata?")
             ask.setWindowTitle("Files exist already!")
             ask.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-            # Get the user click
+            # Get the user click.
             msg_return = ask.exec()
             # If they accept the overwrite, 
             if msg_return == QMessageBox.Yes:
-                # overwrite metadata
-                overwrite_csv_dict(filepath=self.current_data_paths["metadata"], data=self.metadata)
-            # Otherwise, exit the method without starting data collection or closing the new window
+                # overwrite the metadata.
+                overwrite_csv_dict(filepath=self.current_data_paths["metadata"], 
+                                    data=self.data_dict["metadata"]
+                                    )
+            # Otherwise, exit the method without starting data collection or closing the new window.
             elif msg_return == QMessageBox.No:
                 return
 
+        # Finally, now that the user is done editing, do some internal cleaning up - 
+        # Update our internal metadata
+        self.data_dict["metadata"] = metadata
+        # Activate data collection (eventually)
         print("Data collection currently deactivated")
         # self.data_collection = True
-
-        # If we can convert the given Flask entry to an int, bump up our internal counter by 1.
-        # Otherwise, ignore it
+        # Update our internal Flask counter (or, try to - a safety measure in case we were given 
+            # something other than a number)
         try:
             self.flask_n = int(self.new_project_entries["Flask"].text()) + 1
-        except:
+        except ValueError:
             pass
-        
-        # Now that we're done editing, we can close the window and enable future editing of 
-        # project metadata
-        self.new_project_window.close()
+        # Activate the "update project" button - only needs to happen once, but doesn't hurt
         self.title_buttons["Update Project"].setEnabled(True)
+        # Finally finally, close the window
+        self.new_project_window.close()
                        
-
     def _on_update_metadata(self):
-        # overwrite metadata with the entries
-        # if self.metadata is not None:
+        """Updates the metadata with the provided entries"""
+        # Get the existing metadata from our big internal dictionary
+        metadata = self.data_dict["metadata"]
+        # If the user has entered anything (i.e not an empty string), grab it
         for key in self.new_project_entries:
             entry = self.new_project_entries[key].text()
             if entry != "":
-                self.metadata.update({key: entry})
+                metadata.update({key: entry})
         
-        self.metadata.update({"Unix timestamp": time.time()})
-        overwrite_csv_dict(filepath=self.current_data_paths["metadata"], data=self.metadata)
+        # Update our internal timestamp
+        metadata.update({"Unix timestamp": time.time()})
+        # Export and update our metadata
+        overwrite_csv_dict(filepath=self.current_data_paths["metadata"], data=metadata)
+        self.data_dict["metadata"] = metadata
+        # Close the window
         self.new_project_window.close()
-
-        
+  
     def _on_stop_data(self):
         """Callback function for the "Stop Data Collection" button. Sets the data_collection flag to false
         """
         self.data_collection = False
-        self.title_buttons["Update Project"].setEnabled(False)
+        # self.title_buttons["Update Project"].setEnabled(False)
 
     def _send_control_input(self, sensor:str, input_name:str, control_function):
         """Method to grab the control input out of the self.sensor_control_inputs dictionary
