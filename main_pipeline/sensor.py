@@ -59,10 +59,8 @@ except KeyError as e:
 class Sensor():
     """Class that reads from the different sensors and publishes that data over busses"""
     @log_on_end(logging.INFO, "Sensor class initiated", logger=logger)
-    def __init__(self, debug=False) -> None:
-
-        self.arduino = ArduinoInterface(serial_port=comms_config["Arduino"]["serial port"], baud_rate=comms_config["Arduino"]["baud rate"])
-
+    def __init__(self, custom_logger:logging.Logger=None, debug=False) -> None:
+        
         # Read in the sensor config file to grab a list of all the sensors we're working with
         try:
             with open("config/sensor_data.yaml", 'r') as stream:
@@ -77,6 +75,16 @@ class Sensor():
         self.sensor_status_dict = {}
         for name in self.sensor_names:
             self.sensor_status_dict.update({name:0})
+
+        # If we've passed in a custom logger, use that. Otherwise, set up one of our own
+        if logger is not None:
+            self.logger = custom_logger
+        else:
+            self.logger = logger
+
+        self.arduino = ArduinoInterface(serial_port=comms_config["Arduino"]["serial port"], 
+                                        baud_rate=comms_config["Arduino"]["baud rate"],
+                                        custom_logger=self.logger)
 
     def __del__(self):
         self.shutdown_sensors()

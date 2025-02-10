@@ -44,7 +44,7 @@ from main_pipeline.bus import Bus
 import automation_routines
 
 # Set up a logger for this module
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("GUI")
 # Set the lowest-severity log message the logger will handle (debug = lowest, critical = highest)
 logger.setLevel(logging.DEBUG)
 # Create a handler that saves logs to the log folder named as the current date
@@ -56,14 +56,12 @@ logger.addHandler(fh)
 formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(name)s:  %(message)s", datefmt="%H:%M:%S")
 fh.setFormatter(formatter)
 
-
-# main window
 class ApplicationWindow(QWidget):
     """
     This is the Graphical User Interface, or GUI! It sets up the user interface for the main pipeline.
 
     Args:
-        This class inherets from the general QWidget class in order to make the main window. There are lots of different 
+        This class inherits from the general QWidget class in order to make the main window. There are lots of different 
         ways to this inheriting, which make some of the syntax slightly different in between applications. Ah well.
         
     """
@@ -85,20 +83,25 @@ class ApplicationWindow(QWidget):
         self.norm12 = QFont("Helvetica", 12)
         self.norm10 = QFont("Helvetica", 10)
 
-        
+        status_layout = self.build_status_layout()
 
         # Initialize the main sense-interpret-save data pipeline
         self.init_data_pipeline()
-
-        # Start some metadata parameters
-        with open("config/project_metadata.yaml", "r") as stream:
-            self.metadata_dict = yaml.safe_load(stream)
-        self.flask_n = 1
 
         self.data_dict = {
             "all data": {},
             "metadata": {},
         }
+
+        # Set data buffer parameters
+        self.max_buffer_length = 5000 # How long we let the buffers get, helps with memory
+        self.default_plot_length = 60 # Length of time (in sec) we plot before you have to scroll back to see it
+        self.init_data_buffer()
+
+        # Start some metadata parameters
+        with open("config/project_metadata.yaml", "r") as stream:
+            self.metadata_dict = yaml.safe_load(stream)
+        self.flask_n = 1
 
         # Read in the Arduino pin configuration set up in our yaml config
         with open("config/sensor_comms.yaml", "r") as stream:
@@ -109,11 +112,6 @@ class ApplicationWindow(QWidget):
         date = epoch_to_pacific_time(current_time).date
         self.date_str = str(date[0])
         
-        # Set data buffer parameters
-        self.max_buffer_length = 5000 # How long we let the buffers get, helps with memory
-        self.default_plot_length = 60 # Length of time (in sec) we plot before you have to scroll back to see it
-        self.init_data_buffer()
-
         # Pneumatic grid variables
         with open("config/button_locs.yaml", "r") as stream:
             self.button_locs = yaml.safe_load(stream)
@@ -125,7 +123,7 @@ class ApplicationWindow(QWidget):
         # Create the main GUI panels
         # We can arrange things in a QGridLayout by specifying (row, column, rowspan, columnspan)
         main_layout = QGridLayout()
-        main_layout.addLayout(self.build_status_layout(), 2, 0)
+        main_layout.addLayout(status_layout, 2, 0)
         main_layout.addLayout(self.build_control_layout(), 0, 0)
         main_layout.addLayout(self.build_pneum_ctrl_layout(), 1, 0)
         main_layout.addLayout(self.build_plotting_layout(), 0, 1, 1, 2)
@@ -796,6 +794,7 @@ class ApplicationWindow(QWidget):
 
     ## --------------------- PNEUMATIC GRID --------------------- ##
 
+    # Grid buttons
     def build_pneumatic_layout(self):  
 
         pneumatic_layout = QGridLayout()
@@ -816,74 +815,6 @@ class ApplicationWindow(QWidget):
         pneumatic_layout.addWidget(line, 0, 2, 4, 1)
 
         return pneumatic_layout
-       
-    
-    def build_pneum_ctrl_layout(self):
-        pneum_control_layout = QVBoxLayout()
-
-        # Layout title
-        label = self.default_label("Pneumatic Valve Control", self.bold12)
-        pneum_control_layout.addWidget(label)
-        # Button to toggle manual/autonomous pneumatic valve mode control
-        # label = self.default_label("Manual Valve Lockout", self.norm12)
-        # pneum_control_layout.addWidget(label)
-        button = self.default_button(
-                                    text="Enable Autonomous Valve Control", 
-                                    callback=self._on_manual_valve_control, 
-                                    requires_self=True)
-        button.setCheckable(True)
-        # button.setStyleSheet("background-color : green")
-        button.setStyleSheet("QPushButton"
-                             "{"
-                             "background-color : #D89F3F;"
-                             "}"
-                             "QPushButton::checked"
-                             "{"
-                             "background-color : #477FD4;"
-                             "}"
-                             ) 
-        button.setMinimumWidth(int(label.width() * 3))
-        pneum_control_layout.addWidget(button, alignment=Qt.AlignHCenter|Qt.AlignTop)
-        # Combobox to set automation routine
-        
-        self.auto_routine_dict = automation_routines.get_automation_routines()
-
-        label = self.default_label("Automation Routine", self.norm12)
-        pneum_control_layout.addWidget(label, alignment=Qt.AlignHCenter|Qt.AlignBottom)
-        dropdown = QComboBox()
-        dropdown.addItems(self.auto_routine_dict.keys())
-        dropdown.setDisabled(True)
-        dropdown.setFont(self.norm10)
-        self.pneumatic_autonomous_controls.update({"dropdown":dropdown})
-        pneum_control_layout.addWidget(dropdown, alignment=Qt.AlignTop)
-
-        buttons_layout = QHBoxLayout()
-
-        button = self.default_button(callback=partial(self._on_start_autonomous, dropdown), enabled=False)
-        button.setIcon(QIcon("doc/imgs/play.png"))
-        self.pneumatic_autonomous_controls.update({"start":button})
-        buttons_layout.addWidget(button, alignment=Qt.AlignTop) 
-
-        button = self.default_button(callback=partial(self._on_pause_autonomous, dropdown), enabled=False)
-        button.setIcon(QIcon("doc/imgs/pause.png"))
-        self.pneumatic_autonomous_controls.update({"pause":button})
-        buttons_layout.addWidget(button, alignment=Qt.AlignTop)
-
-        button = self.default_button(callback=partial(self._on_stop_autonomous, dropdown), enabled=False)
-        button.setIcon(QIcon("doc/imgs/stop.png"))
-        self.pneumatic_autonomous_controls.update({"stop":button})
-        buttons_layout.addWidget(button, alignment=Qt.AlignTop)
-
-        pneum_control_layout.addLayout(buttons_layout)
-
-        for _ in range(2):
-            line = self.dividing_line()
-            pneum_control_layout.addWidget(line) 
-
-        # Position the widgets at the top of the layout
-        # pneum_control_layout.setAlignment(QtCore.Qt.AlignTop)
-
-        return pneum_control_layout
 
     def make_pneumatic_button_grid(self):
         parent_widget = QWidget()
@@ -946,8 +877,7 @@ class ApplicationWindow(QWidget):
 
         self.button_edit_window.show()
 
-    def _on_push_pneumatic_button(self, button:CircleButton):
-             
+    def _on_push_pneumatic_button(self, button:CircleButton):          
         # Find the arduino pin that corresponds to our button number
         button_num = button.text()   
         try:
@@ -962,27 +892,102 @@ class ApplicationWindow(QWidget):
         else:
             self.sensor.arduino.set_pin_low(pin)
 
-    def _on_manual_valve_control(self, button:QPushButton):
-        # If button is checked
-        if button.isChecked():
-            # button.setStyleSheet("background-color : light-grey")
-            button.setText("Enable Manual Valve Control")
-            # for pneumatic_button in self.pneumatic_grid_buttons:
-            #     pneumatic_button.setDisabled(True)
-            for control in self.pneumatic_autonomous_controls:
-                self.pneumatic_autonomous_controls[control].setEnabled(True)
-            # button.setText("Click for manual valve controls")
-            # label.setText("Valve Controls: Autonomous")
-        # If button is unchecked
+    def _control_pneumatic_button_movement(self, control_button:QPushButton):
+        if self.pneumatic_grid_buttons[0].button_locked:
+            for pneumatic_button in self.pneumatic_grid_buttons:
+                pneumatic_button.unlock_button_movement() # Unlock the buttons
+                control_button.setText("Lock Button Positions") # Change the button text to reflect the button status
+                self.buttons_locked = False # Keep track of our own internal flag
         else:
-            # button.setStyleSheet("background-color : green")
+            for pneumatic_button in self.pneumatic_grid_buttons:
+                pneumatic_button.lock_button_movement()
+                control_button.setText("Unlock Button Positions")
+                self.buttons_locked = True
+
+    def _save_pneumatic_button_positions(self):
+        # button_loc_dic = {}
+        for i, pneumatic_button in enumerate(self.pneumatic_grid_buttons, start=1):
+            self.button_locs[f"button {i}"]["x"] = pneumatic_button.get_center()[0]
+            self.button_locs[f"button {i}"]["y"] = pneumatic_button.get_center()[1]
+        
+        with open("config/button_locs.yaml", "w") as yaml_file:
+            yaml.dump(self.button_locs, yaml_file, sort_keys=False)
+
+    # Autonomous / manual control
+    def build_pneum_ctrl_layout(self):
+        pneum_control_layout = QVBoxLayout()
+        # Layout title
+        label = self.default_label("Pneumatic Valve Control", self.bold12)
+        pneum_control_layout.addWidget(label)
+        # Button to toggle manual/autonomous pneumatic valve mode control
+        button = self.default_button(
+                                    text="Enable Autonomous Valve Control", 
+                                    callback=self._on_manual_valve_control, 
+                                    requires_self=True)
+        button.setCheckable(True) # Make the button toggle instead of push
+        button.setStyleSheet("QPushButton"
+                             "{"
+                             "background-color : #D89F3F;"
+                             "}"
+                             "QPushButton::checked"
+                             "{"
+                             "background-color : #477FD4;"
+                             "}"
+                             ) 
+        button.setMinimumWidth(int(label.width() * 3))
+        pneum_control_layout.addWidget(button, alignment=Qt.AlignHCenter|Qt.AlignTop)
+        # Automation routine section
+        label = self.default_label("Automation Routine", self.norm12)
+        pneum_control_layout.addWidget(label, alignment=Qt.AlignHCenter|Qt.AlignBottom)
+        # Get the available routines
+        self.auto_routine_dict = automation_routines.get_automation_routines()
+        # Make a combobox to let the user choose the automation routine
+        dropdown = QComboBox()
+        dropdown.addItems(self.auto_routine_dict.keys())
+        dropdown.setDisabled(True)
+        dropdown.setFont(self.norm10)
+        self.pneumatic_autonomous_controls.update({"dropdown":dropdown})
+        pneum_control_layout.addWidget(dropdown, alignment=Qt.AlignTop)
+        # Make buttons to play, pause, and stop the automation routine
+        buttons_layout = QHBoxLayout()
+        # Play
+        button = self.default_button(callback=partial(self._on_start_autonomous, dropdown), enabled=False)
+        button.setIcon(QIcon("doc/imgs/play.png"))
+        self.pneumatic_autonomous_controls.update({"start":button})
+        buttons_layout.addWidget(button, alignment=Qt.AlignTop) 
+        # Pause
+        button = self.default_button(callback=partial(self._on_pause_autonomous, dropdown), enabled=False)
+        button.setIcon(QIcon("doc/imgs/pause.png"))
+        self.pneumatic_autonomous_controls.update({"pause":button})
+        buttons_layout.addWidget(button, alignment=Qt.AlignTop)
+        # Stop
+        button = self.default_button(callback=partial(self._on_stop_autonomous, dropdown), enabled=False)
+        button.setIcon(QIcon("doc/imgs/stop.png"))
+        self.pneumatic_autonomous_controls.update({"stop":button})
+        buttons_layout.addWidget(button, alignment=Qt.AlignTop)
+        pneum_control_layout.addLayout(buttons_layout)
+        # Add two dividing lines, for panache
+        for _ in range(2):
+            line = self.dividing_line()
+            pneum_control_layout.addWidget(line) 
+
+        return pneum_control_layout
+
+    def _on_manual_valve_control(self, button:QPushButton):
+        # If button is checked, lock out manual controls
+        if button.isChecked():
+            button.setText("Enable Manual Valve Control")
+            for pneumatic_button in self.pneumatic_grid_buttons:
+                pneumatic_button.setDisabled(True)
+            for _, control in self.pneumatic_autonomous_controls.items():
+                control.setEnabled(True)
+        # If button is unchecked, lock out autonomous controls
+        else:
             button.setText("Enable Autonomous Valve Control")
             for pneumatic_button in self.pneumatic_grid_buttons:
                 pneumatic_button.setEnabled(True)
-            for control in self.pneumatic_autonomous_controls:
-                self.pneumatic_autonomous_controls[control].setDisabled(True)
-            # button.setText("Click for autonomous valve controls")
-            # label.setText("Valve Controls: Manual")
+            for _, control in self.pneumatic_autonomous_controls.items():
+                control.setDisabled(True)
 
     def _on_start_autonomous(self, routine_select:QComboBox):
         routine_name = routine_select.currentText()
@@ -1008,7 +1013,6 @@ class ApplicationWindow(QWidget):
             else: # something has gone Wrong
                 logger.warning(f"Unknown process status: {status}")
 
-
         self.pneumatic_autonomous_controls["start"].setDisabled(True)
         self.pneumatic_autonomous_controls["pause"].setEnabled(True)
         self.pneumatic_autonomous_controls["stop"].setEnabled(True)
@@ -1017,14 +1021,15 @@ class ApplicationWindow(QWidget):
         routine_name = routine_select.currentText()
         logger.info(f"Pausing autonomous routine: {routine_name}")
 
+        # Try to get our process status
         try:
             self.p.status()
+        # If we can't, the process doesn't exist. We're have nothing to pause, so don't do anything
         except:
             pass
+        # If we can, pause the process
         else:
             self.p.suspend()
-
-        # self.auto_routine_dict[routine_name].pause()
 
         self.pneumatic_autonomous_controls["start"].setEnabled(True)
 
@@ -1032,37 +1037,15 @@ class ApplicationWindow(QWidget):
         routine_name = routine_select.currentText()
         logger.info(f"Stopping autonomous routine: {routine_name}")
 
-        
+        # If our process is alive, kill it
         if self.multiprocess.is_alive():
             self.p.kill()
             self.multiprocess.terminate()
             self.multiprocess.join()
-        # self.auto_routine_dict[routine_name].stop()
 
         self.pneumatic_autonomous_controls["start"].setEnabled(True)
         self.pneumatic_autonomous_controls["pause"].setDisabled(True)
         self.pneumatic_autonomous_controls["stop"].setDisabled(True)
-
-    def _control_pneumatic_button_movement(self, control_button:QPushButton):
-        if self.pneumatic_grid_buttons[0].button_locked:
-            for pneumatic_button in self.pneumatic_grid_buttons:
-                pneumatic_button.unlock_button_movement() # Unlock the buttons
-                control_button.setText("Lock Button Positions") # Change the button text to reflect the button status
-                self.buttons_locked = False # Keep track of our own internal flag
-        else:
-            for pneumatic_button in self.pneumatic_grid_buttons:
-                pneumatic_button.lock_button_movement()
-                control_button.setText("Unlock Button Positions")
-                self.buttons_locked = True
-
-    def _save_pneumatic_button_positions(self):
-        # button_loc_dic = {}
-        for i, pneumatic_button in enumerate(self.pneumatic_grid_buttons, start=1):
-            self.button_locs[f"button {i}"]["x"] = pneumatic_button.get_center()[0]
-            self.button_locs[f"button {i}"]["y"] = pneumatic_button.get_center()[1]
-        
-        with open("config/button_locs.yaml", "w") as yaml_file:
-            yaml.dump(self.button_locs, yaml_file, sort_keys=False)
             
     ## --------------------- STATUS PANEL --------------------- ##
 
@@ -1284,7 +1267,7 @@ class ApplicationWindow(QWidget):
         for each sense/interpret/save process (see run_data_collection for how these are all used)
         """
         # Create each main object of the pipeline
-        self.sensor = Sensor(debug=False)
+        self.sensor = Sensor(custom_logger=logger, debug=False)
         self.interpreter = Interpreter()
         self.writer = Writer()
 

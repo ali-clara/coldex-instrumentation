@@ -22,7 +22,7 @@ fh.setFormatter(formatter)
 
 class ArduinoInterface():
 
-    def __init__(self, serial_port, baud_rate):
+    def __init__(self, serial_port, baud_rate, custom_logger=None):
         self.initialize_pyserial(serial_port, baud_rate)
 
         # Different serial command characters

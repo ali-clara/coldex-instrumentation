@@ -20,7 +20,7 @@ fh.setFormatter(formatter)
 
 class ArduinoInterface():
 
-    def __init__(self, serial_port, baud_rate):
+    def __init__(self, serial_port, baud_rate, custom_logger=None):
         self.initialize_pyserial(serial_port, baud_rate)
 
         # Different serial command characters
@@ -28,6 +28,13 @@ class ArduinoInterface():
         self.end_character = ">"
         self.one_thing = "1"
         self.another_thing = "2"
+
+        if custom_logger is not None:
+            self.logger = custom_logger
+        else:
+            self.logger = logger
+
+        self.logger.info("test 3")
 
     def initialize_pyserial(self, port, baud):
         pass
@@ -69,13 +76,13 @@ class ArduinoInterface():
         try:
             pin_int = int(pin)
         except ValueError as e:
-            logger.error(f"Invalid arduino pin: {pin} ({e})")
+            self.logger.error(f"Invalid arduino pin: {pin} ({e})")
             return False
         else:
             if pin_int > 1 and pin_int <= 69:
                 pass
             else:
-                logger.error(f"Invalid arduino pin: {pin} not between 1-69")
+                self.logger.error(f"Invalid arduino pin: {pin} not between 1-69")
                 return False
 
         pin_str = str(pin)
@@ -86,15 +93,16 @@ class ArduinoInterface():
     
     def set_pin_high(self, pin):
         pin = self.validate_and_format_pin(pin)
+        self.logger.info("--------------")
         if pin:
-            logger.info(f"Setting pin {pin} high")
+            self.logger.info(f"Setting pin {pin} high")
             msg_str = "01;"+pin
             self.send_command(msg_str)
 
     def set_pin_low(self, pin):
         pin = self.validate_and_format_pin(pin)
         if pin:
-            logger.info(f"Setting pin {pin} low")
+            self.logger.info(f"Setting pin {pin} low")
             msg_str = "00;"+pin
             self.send_command(msg_str)
 
