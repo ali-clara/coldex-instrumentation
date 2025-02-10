@@ -126,6 +126,13 @@ class ApplicationWindow(QWidget):
         main_layout.addLayout(self.build_pneum_ctrl_layout(), 1, 0)
         main_layout.addLayout(self.build_plotting_layout(), 0, 1, 1, 2)
         main_layout.addLayout(self.build_pneumatic_layout(), 1, 1, 2, 2)
+
+        main_layout.setColumnStretch(0, 0)
+        main_layout.setColumnStretch(1, 1)
+        main_layout.setRowStretch(0, 1)
+        main_layout.setRowStretch(1, 1)
+        main_layout.setRowStretch(2, 1)
+
         self.setLayout(main_layout)
         
         # Create a threadpool for this class, so we can do threading later
@@ -150,22 +157,31 @@ class ApplicationWindow(QWidget):
         """
         self.sensor.shutdown_sensors()
     
-    # def closeEvent(self, event):
-    #     """This method overwrites the default QWidget closeEvent that triggers when the window "X" is clicked.
-    #     It ensures we can shutdown sensors cleanly by opening a QMessageBox to prompt the user to quit/cancel
-    #     """
-    #     self.check_close_event()
-    #     # If we actually want to shut down, shutdown the sensors and then accept the closeEvent
-    #     if self.accept_quit:
-    #         self.sensor.shutdown_sensors()
-    #         try:
-    #             self.executor.shutdown()
-    #         except:
-    #             pass
-    #         event.accept()
-    #     # Otherwise, ignore it
-    #     else:
-    #         event.ignore()
+    def closeEvent(self, event):
+        """This method overwrites the default QWidget closeEvent that triggers when the window "X" is clicked.
+        It ensures we can shutdown sensors cleanly by opening a QMessageBox to prompt the user to quit/cancel
+        """
+
+        try:
+            if self.mp.is_alive():
+                self.p.kill()
+                self.mp.terminate()
+                self.mp.join()
+        except AttributeError:
+            pass
+        
+        # self.check_close_event()
+        # # If we actually want to shut down, shutdown the sensors and then accept the closeEvent
+        # if self.accept_quit:
+        #     self.sensor.shutdown_sensors()
+        #     try:
+        #         self.executor.shutdown()
+        #     except:
+        #         pass
+        #     event.accept()
+        # # Otherwise, ignore it
+        # else:
+        #     event.ignore()
 
     def check_close_event(self):
         """Method to check if the user actually wants to quit or not. Opens a QMessageBox and stores
@@ -225,8 +241,6 @@ class ApplicationWindow(QWidget):
         self.make_sensor_control_panel(control_layout, sensor_button_info, control_button_info, starting_row=start_next_row, colspan=title_colspan)
         # Position the panel at the top of the window and make it stretchy
         control_layout.setAlignment(QtCore.Qt.AlignTop)
-        for i in range(title_colspan):
-            control_layout.setColumnStretch(i, 1)
 
         return control_layout
     
@@ -678,7 +692,7 @@ class ApplicationWindow(QWidget):
         button_layout.addWidget(self.default_button("Cancel", self.bold12, self.new_project_window.close), 
                                 alignment=Qt.AlignLeft)
         button_layout.setAlignment(Qt.AlignVCenter | Qt.AlignBottom)
-        layout.addLayout(button_layout, stretch=1)
+        # layout.addLayout(button_layout, stretch=1)
 
         # Add the widgets to the new window and show the window
         self.new_project_window.setLayout(layout)
@@ -807,42 +821,54 @@ class ApplicationWindow(QWidget):
         label = self.default_label("Pneumatic Valve Control", self.bold12)
         pneum_control_layout.addWidget(label)
         # Button to toggle manual/autonomous pneumatic valve mode control
-        label = self.default_label("Manual Valve Lockout", self.norm12)
-        pneum_control_layout.addWidget(label)
-        button = self.default_button(callback=self._on_manual_valve_control, requires_self=True)
+        # label = self.default_label("Manual Valve Lockout", self.norm12)
+        # pneum_control_layout.addWidget(label)
+        button = self.default_button(
+                                    text="Enable Autonomous Valve Control", 
+                                    callback=self._on_manual_valve_control, 
+                                    requires_self=True)
         button.setCheckable(True)
-        button.setStyleSheet("background-color : green")
-        button.setFixedWidth(int(label.width() * 1.5))
-        pneum_control_layout.addWidget(button, alignment=QtCore.Qt.AlignHCenter)
+        # button.setStyleSheet("background-color : green")
+        button.setStyleSheet("QPushButton"
+                             "{"
+                             "background-color : #D89F3F;"
+                             "}"
+                             "QPushButton::checked"
+                             "{"
+                             "background-color : #477FD4;"
+                             "}"
+                             ) 
+        button.setMinimumWidth(int(label.width() * 3))
+        pneum_control_layout.addWidget(button, alignment=Qt.AlignHCenter|Qt.AlignTop)
         # Combobox to set automation routine
         
         self.auto_routine_dict = automation_routines.get_automation_routines()
 
         label = self.default_label("Automation Routine", self.norm12)
-        pneum_control_layout.addWidget(label)
+        pneum_control_layout.addWidget(label, alignment=Qt.AlignHCenter|Qt.AlignBottom)
         dropdown = QComboBox()
         dropdown.addItems(self.auto_routine_dict.keys())
         dropdown.setDisabled(True)
         dropdown.setFont(self.norm10)
         self.pneumatic_autonomous_controls.update({"dropdown":dropdown})
-        pneum_control_layout.addWidget(dropdown)
+        pneum_control_layout.addWidget(dropdown, alignment=Qt.AlignTop)
 
         buttons_layout = QHBoxLayout()
 
         button = self.default_button(callback=partial(self._on_start_autonomous, dropdown), enabled=False)
         button.setIcon(QIcon("doc/imgs/play.png"))
         self.pneumatic_autonomous_controls.update({"start":button})
-        buttons_layout.addWidget(button) 
+        buttons_layout.addWidget(button, alignment=Qt.AlignTop) 
 
         button = self.default_button(callback=partial(self._on_pause_autonomous, dropdown), enabled=False)
         button.setIcon(QIcon("doc/imgs/pause.png"))
         self.pneumatic_autonomous_controls.update({"pause":button})
-        buttons_layout.addWidget(button)
+        buttons_layout.addWidget(button, alignment=Qt.AlignTop)
 
         button = self.default_button(callback=partial(self._on_stop_autonomous, dropdown), enabled=False)
         button.setIcon(QIcon("doc/imgs/stop.png"))
         self.pneumatic_autonomous_controls.update({"stop":button})
-        buttons_layout.addWidget(button)
+        buttons_layout.addWidget(button, alignment=Qt.AlignTop)
 
         pneum_control_layout.addLayout(buttons_layout)
 
@@ -851,7 +877,7 @@ class ApplicationWindow(QWidget):
             pneum_control_layout.addWidget(line) 
 
         # Position the widgets at the top of the layout
-        pneum_control_layout.setAlignment(QtCore.Qt.AlignTop)
+        # pneum_control_layout.setAlignment(QtCore.Qt.AlignTop)
 
         return pneum_control_layout
 
@@ -860,13 +886,21 @@ class ApplicationWindow(QWidget):
         parent_widget.setMinimumHeight(int(self.height()/2.25))
         parent_widget.setMinimumWidth(int(self.width()*0.6))
 
+        # For each button, create our custom button object and add the specified 
+        #   horizontal and vertical lines from config/button_locs.yaml. Since we 
+        #   want these lines to follow along if the button is moved, I've called 
+        #   them "ducklings"
         for i in range(1, self.num_buttons+1):
-            start_pos = (self.button_locs[f"button {i}"]["x"], self.button_locs[f"button {i}"]["y"])
-
-            hrz_lines = self.button_locs[f"button {i}"]["hlines"]
-            vrt_lines = self.button_locs[f"button {i}"]["vlines"]
-
+            # First, see if we've specified either horizontal or vertical lines, catching the 
+            #   error that would pop up if we haven't entered either of these dict keys
+            try:
+                hrz_lines = self.button_locs[f"button {i}"]["hlines"]
+                vrt_lines = self.button_locs[f"button {i}"]["vlines"]
+            except KeyError:
+                hrz_lines = []
+                vrt_lines = []
             ducklings = []
+            # Compile the vertical lines and add to "ducklings"
             try:
                 for baseline, thickness in zip(vrt_lines["baselines"], vrt_lines["thicknesses"]):
                     line = VLine(parent_widget, self.button_locs[f"button {i}"]["y"], baseline, thickness)
@@ -874,7 +908,7 @@ class ApplicationWindow(QWidget):
                     ducklings.append(line)
             except TypeError:
                 pass
-
+            # Compile the horizontal lines and add to "ducklings"
             try:
                 for baseline, thickness in zip(hrz_lines["baselines"], hrz_lines["thicknesses"]):
                     line = HLine(parent_widget, self.button_locs[f"button {i}"]["x"], baseline, thickness)
@@ -882,7 +916,9 @@ class ApplicationWindow(QWidget):
                     ducklings.append(line)
             except TypeError:
                 pass
-
+            # Finally, create the button at the specified position and assign it ducklings 
+            #   and a callback function
+            start_pos = (self.button_locs[f"button {i}"]["x"], self.button_locs[f"button {i}"]["y"])
             button = CircleButton(radius=65, parent=parent_widget, start_pos=start_pos, ducklings=ducklings)
             button.setText(str(i))
             button.setFont(self.norm12)
@@ -907,6 +943,7 @@ class ApplicationWindow(QWidget):
         self.button_edit_window.show()
 
     def _on_push_pneumatic_button(self, button:CircleButton):
+        print("click!")
         button_num = button.text()
         if len(button_num) == 1:
             button_num = "0"+button_num
@@ -919,16 +956,18 @@ class ApplicationWindow(QWidget):
     def _on_manual_valve_control(self, button:QPushButton):
         # If button is checked
         if button.isChecked():
-            button.setStyleSheet("background-color : grey")
-            for pneumatic_button in self.pneumatic_grid_buttons:
-                pneumatic_button.setDisabled(True)
+            # button.setStyleSheet("background-color : light-grey")
+            button.setText("Enable Manual Valve Control")
+            # for pneumatic_button in self.pneumatic_grid_buttons:
+            #     pneumatic_button.setDisabled(True)
             for control in self.pneumatic_autonomous_controls:
                 self.pneumatic_autonomous_controls[control].setEnabled(True)
             # button.setText("Click for manual valve controls")
             # label.setText("Valve Controls: Autonomous")
         # If button is unchecked
         else:
-            button.setStyleSheet("background-color : green")
+            # button.setStyleSheet("background-color : green")
+            button.setText("Enable Autonomous Valve Control")
             for pneumatic_button in self.pneumatic_grid_buttons:
                 pneumatic_button.setEnabled(True)
             for control in self.pneumatic_autonomous_controls:
@@ -946,7 +985,11 @@ class ApplicationWindow(QWidget):
         # we have not yet started - self.p doesn't exist
         except:
             pid = os.getpid()
-            self.mp = multiprocessing.Process(target=self.auto_routine_dict[routine_name].run)
+            self.mp = multiprocessing.Process(target=self.auto_routine_dict[routine_name].run,
+                                              kwargs={
+                                                  "logger": logger,
+                                                  "buttons": self.pneumatic_grid_buttons,
+                                                  })
             self.mp.start()
             self.p = psutil.Process(self.mp.pid)
         # we have started - self.p does exist
@@ -955,11 +998,9 @@ class ApplicationWindow(QWidget):
                 self.p.resume()
             elif status == "sleeping" or status == "running": # we're running
                 pass 
-            else:
+            else: # something has gone Wrong
                 logger.warning(f"Unknown process status: {status}")
 
-        # worker = Worker(self.auto_routine_dict[routine_name].run)
-        # self.threadpool.start(worker)
 
         self.pneumatic_autonomous_controls["start"].setDisabled(True)
         self.pneumatic_autonomous_controls["pause"].setEnabled(True)

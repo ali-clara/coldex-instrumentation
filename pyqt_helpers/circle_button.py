@@ -267,7 +267,7 @@ class CircleButton(QPushButton):
 
         # Trigger the original mouseReleaseEvent callback
         super().mouseMoveEvent(event)
-
+    
     def mouseReleaseEvent(self, event:QMouseEvent):
         """Overwrites the QPushButton mouseReleaseEvent method. Ignores the button click if we've
         moved the button more than a threshold value"""
