@@ -65,13 +65,36 @@ class ArduinoInterface():
         else:
             logger.debug(f"Invalid Arduino command: {command}")
 
-    def set_pin_high(self, pin:str):
-        logger.info(f"Setting pin {pin} high")
-        msg_str = "01;"+pin
-        self.send_command(msg_str)
+    def validate_and_format_pin(self, pin):
+        try:
+            pin_int = int(pin)
+        except ValueError as e:
+            logger.error(f"Invalid arduino pin: {pin} ({e})")
+            return False
+        else:
+            if pin_int > 1 and pin_int <= 69:
+                pass
+            else:
+                logger.error(f"Invalid arduino pin: {pin} not between 1-69")
+                return False
 
-    def set_pin_low(self, pin:str):
-        logger.info(f"Setting pin {pin} low")
-        msg_str = "00;"+pin
-        self.send_command(msg_str)
+        pin_str = str(pin)
+        if len(pin_str) == 1:
+            pin_str = "0"+pin_str
+        
+        return pin_str
+    
+    def set_pin_high(self, pin):
+        pin = self.validate_and_format_pin(pin)
+        if pin:
+            logger.info(f"Setting pin {pin} high")
+            msg_str = "01;"+pin
+            self.send_command(msg_str)
+
+    def set_pin_low(self, pin):
+        pin = self.validate_and_format_pin(pin)
+        if pin:
+            logger.info(f"Setting pin {pin} low")
+            msg_str = "00;"+pin
+            self.send_command(msg_str)
 

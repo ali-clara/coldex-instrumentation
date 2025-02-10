@@ -28,7 +28,6 @@ import traceback
 import pandas as pd
 import logging
 from logdecorator import log_on_start , log_on_end , log_on_error
-import dill
 from pathlib import Path
 
 from pyqt_helpers.live_plots import MyFigureCanvas
@@ -86,20 +85,24 @@ class ApplicationWindow(QWidget):
         self.norm12 = QFont("Helvetica", 12)
         self.norm10 = QFont("Helvetica", 10)
 
-        with open("config/project_metadata.yaml", "r") as stream:
-            self.metadata_dict = yaml.safe_load(stream)
+        
 
         # Initialize the main sense-interpret-save data pipeline
         self.init_data_pipeline()
 
         # Start some metadata parameters
+        with open("config/project_metadata.yaml", "r") as stream:
+            self.metadata_dict = yaml.safe_load(stream)
         self.flask_n = 1
-        self.metadata = None
 
         self.data_dict = {
             "all data": {},
             "metadata": {},
         }
+
+        # Read in the Arduino pin configuration set up in our yaml config
+        with open("config/sensor_comms.yaml", "r") as stream:
+            self.sensor_comms = yaml.safe_load(stream)
 
         # Get today's date
         current_time = time.time()
@@ -164,10 +167,10 @@ class ApplicationWindow(QWidget):
         """
 
         try:
-            if self.mp.is_alive():
+            if self.multiprocess.is_alive():
                 self.p.kill()
-                self.mp.terminate()
-                self.mp.join()
+                self.multiprocess.terminate()
+                self.multiprocess.join()
         except AttributeError:
             pass
         
@@ -944,15 +947,20 @@ class ApplicationWindow(QWidget):
         self.button_edit_window.show()
 
     def _on_push_pneumatic_button(self, button:CircleButton):
-        print("click!")
-        button_num = button.text()
-        if len(button_num) == 1:
-            button_num = "0"+button_num
-        logger.info(f"button {button_num} set to {button.get_state()}")
+             
+        # Find the arduino pin that corresponds to our button number
+        button_num = button.text()   
+        try:
+            pin = self.sensor_comms["Pneumatic valves"][f"Button {button_num}"]
+        except KeyError as e:
+            logger.error(f"Could not find Button {button_num} in sensor_comms.yaml (Key error {e})")
+            return
+        # Send the arduino signal accordingly
+        logger.info(f"Button {button_num} set to {button.get_state()}")
         if button.is_open():
-            self.sensor.arduino.set_pin_high(button_num)
+            self.sensor.arduino.set_pin_high(pin)
         else:
-            self.sensor.arduino.set_pin_low(button_num)
+            self.sensor.arduino.set_pin_low(pin)
 
     def _on_manual_valve_control(self, button:QPushButton):
         # If button is checked
@@ -980,24 +988,17 @@ class ApplicationWindow(QWidget):
         routine_name = routine_select.currentText()
         logger.info(f"Starting autonomous routine: {routine_name}")
         
+        # try to get our process status
         try:
             status = self.p.status()
-            print(status)
         # we have not yet started - self.p doesn't exist
-
-        # I DON'T NEED TO PASS IN THE BUTTONS, WE CAN JUST LOAD THE ARDUINO
-        # GOOBER BEHAVIOR
         except:
-            for button in self.pneumatic_grid_buttons:
-                fn = button.click
-                pickled = dill.dumps(fn, byref=False)
-            buttons_fns = [button.click for button in self.pneumatic_grid_buttons]
-            _buttons_fns = dill.dumps(buttons_fns, byref=True)
             pid = os.getpid()
-            self.mp = multiprocessing.Process(target=self.auto_routine_dict[routine_name].run,
-                                            args=(logger))
-            self.mp.start()
-            self.p = psutil.Process(self.mp.pid)
+            arduino = self.sensor.arduino
+            self.multiprocess = multiprocessing.Process(target=self.auto_routine_dict[routine_name].run,
+                                            kwargs={"logger": logger, "arduino": arduino})
+            self.multiprocess.start()
+            self.p = psutil.Process(self.multiprocess.pid)
         # we have started - self.p does exist
         else:
             if status == "stopped": # we're suspended
@@ -1032,10 +1033,10 @@ class ApplicationWindow(QWidget):
         logger.info(f"Stopping autonomous routine: {routine_name}")
 
         
-        if self.mp.is_alive():
+        if self.multiprocess.is_alive():
             self.p.kill()
-            self.mp.terminate()
-            self.mp.join()
+            self.multiprocess.terminate()
+            self.multiprocess.join()
         # self.auto_routine_dict[routine_name].stop()
 
         self.pneumatic_autonomous_controls["start"].setEnabled(True)
