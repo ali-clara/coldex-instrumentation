@@ -12,21 +12,17 @@
 
 import time
 from pyqt_helpers.circle_button import CircleButton
+import dill
 
 class TestRoutine:
-    def __init__(self, **kwargs):
+    def __init__(self, logger):
 
         # an example of how **kwargs works
-        print("kwargs: ")
-        for key, value in kwargs.items():
-            print(f"key: {key}, value: {value}")
-        print("-----")
-
-        try:
-            self.buttons = kwargs["buttons"]
-        except KeyError:
-            self.buttons = []
-
+        # print("kwargs: ")
+        # for key, value in kwargs.items():
+        #     print(f"key: {key}, value: {value}")
+        # print("-----")
+        
         self.i = 0
 
     def run_routine(self):
@@ -41,8 +37,8 @@ class TestRoutine:
             button.click()
             time.sleep(0.5)
 
-def run(**kwargs):
-    myRoutine = TestRoutine(**kwargs)
+def run(logger):
+    myRoutine = TestRoutine(logger)
     myRoutine.run_routine()
 
 if __name__ == "__main__":

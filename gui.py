@@ -28,6 +28,7 @@ import traceback
 import pandas as pd
 import logging
 from logdecorator import log_on_start , log_on_end , log_on_error
+import dill
 from pathlib import Path
 
 from pyqt_helpers.live_plots import MyFigureCanvas
@@ -983,13 +984,18 @@ class ApplicationWindow(QWidget):
             status = self.p.status()
             print(status)
         # we have not yet started - self.p doesn't exist
+
+        # I DON'T NEED TO PASS IN THE BUTTONS, WE CAN JUST LOAD THE ARDUINO
+        # GOOBER BEHAVIOR
         except:
+            for button in self.pneumatic_grid_buttons:
+                fn = button.click
+                pickled = dill.dumps(fn, byref=False)
+            buttons_fns = [button.click for button in self.pneumatic_grid_buttons]
+            _buttons_fns = dill.dumps(buttons_fns, byref=True)
             pid = os.getpid()
             self.mp = multiprocessing.Process(target=self.auto_routine_dict[routine_name].run,
-                                              kwargs={
-                                                  "logger": logger,
-                                                  "buttons": self.pneumatic_grid_buttons,
-                                                  })
+                                            args=(logger))
             self.mp.start()
             self.p = psutil.Process(self.mp.pid)
         # we have started - self.p does exist
@@ -1010,7 +1016,12 @@ class ApplicationWindow(QWidget):
         routine_name = routine_select.currentText()
         logger.info(f"Pausing autonomous routine: {routine_name}")
 
-        self.p.suspend()
+        try:
+            self.p.status()
+        except:
+            pass
+        else:
+            self.p.suspend()
 
         # self.auto_routine_dict[routine_name].pause()
 

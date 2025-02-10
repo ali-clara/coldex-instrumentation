@@ -11,48 +11,49 @@ import multiprocessing
 import os
 import psutil
 import time
- 
-def print_numbers():
-    ctr = 0
-    for x in range(100):
-        ctr +=1
-        print(ctr)
-        time.sleep(0.5)
- 
-pid=os.getpid()
-mp = multiprocessing.Process(target=print_numbers)
-mp.start()
 
-print(pid)
-print(mp.pid)
-print("--")
+def print_numbers(start, stop):
+        ctr = start
+        for x in range(start, stop):
+            ctr +=1
+            print(ctr)
+            time.sleep(0.5)
 
-p= psutil.Process(mp.pid)
-p.resume()
+if __name__ == "__main__":
+     
+    pid=os.getpid()
+    mp = multiprocessing.Process(target=print_numbers, args=(20, 100))
+    mp.start()
 
-print('pid =', pid, p)
-print("status", p.status())
-time.sleep(2.5)
-print("status", p.status())
+    print(pid)
+    print(mp.pid)
+    print("--")
+
+    p= psutil.Process(mp.pid)
+    # p.resume()
+
+    print('pid =', pid, p)
+    print("status", p.status())
+    time.sleep(2.5)
+    print("status", p.status())
 
 
-p.suspend()
-print("status", p.status())
+    p.suspend()
+    print("status", p.status())
 
- 
-time.sleep(2.5)
-print("resume it", mp.is_alive())
-p.resume()
+    
+    time.sleep(2.5)
+    print("resume it", mp.is_alive())
+    p.resume()
 
-print("status", p.status())
+    print("status", p.status())
 
-time.sleep(2.5)
-if mp.is_alive():
-     print("terminate", mp.is_alive)
-     p.kill()
-     p.kill()
-    #  mp.terminate()
-    #  mp.join()
-else:
-    print("terminated node")
-print("status", mp.is_alive()) 
+    time.sleep(2.5)
+    if mp.is_alive():
+        print("terminate", mp.is_alive())
+        p.kill()
+        mp.terminate()
+        mp.join()
+    else:
+        print("terminated node")
+    print("status", mp.is_alive()) 
