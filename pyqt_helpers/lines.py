@@ -4,7 +4,7 @@ from PyQt5.QtCore import *
 
 class HLine(QFrame):
     """A horizontal line"""
-    def __init__(self, parent, start_x=0, baseline=None, thickness=20):
+    def __init__(self, parent, start_x=0, start_y=0, init_length=50, thickness=20):
         super().__init__(parent)
         self.setMinimumHeight(thickness)
         self.setMidLineWidth(thickness)
@@ -15,13 +15,13 @@ class HLine(QFrame):
         parent_height = self.parentWidget().geometry().height()
 
         # make sure the line shows up at the beginning by seeding it with a geometry
-        if start_x > baseline:
-            self.setGeometry(0,0,0,0)
-        else:
-            self.setGeometry(parent_width, parent_height, 0, 0)
+        # if init_length < 0:
+        #     self.setGeometry(0,0,0,0)
+        # else:
+        #     self.setGeometry(parent_width, parent_height, 0, 0)
+        self.setGeometry(start_x, start_y, init_length, 0)
 
-        if baseline is None:
-            baseline = int(parent_width / 2)
+        baseline = start_x + init_length
         self.setBaseline(baseline)
 
         # Movement params
@@ -34,6 +34,12 @@ class HLine(QFrame):
     
     def setBaseline(self, baseline):
         self.baseline_position = baseline
+
+    def unlock_line_movement(self):
+        self.line_locked = False
+
+    def lock_line_movement(self):
+        self.line_locked = True
 
     def mousePressEvent(self, event:QMouseEvent):
         """Overwrites the default mouse click callback. Every time we click the mouse, record the position"""
@@ -58,7 +64,7 @@ class HLine(QFrame):
     
 class VLine(QFrame):
     """A vertical line"""
-    def __init__(self, parent, start_y=0, baseline=None, thickness=20):
+    def __init__(self, parent, start_x=0, start_y=0, init_length=50, thickness=20):
         super().__init__(parent)
         self.setMinimumWidth(thickness)
         self.setMidLineWidth(thickness)
@@ -67,15 +73,17 @@ class VLine(QFrame):
         
         parent_height = self.parentWidget().geometry().height()
         parent_width = self.parentWidget().geometry().width()
-        if baseline is None:
-            baseline = int(parent_height / 2)
+
+        baseline = start_y + init_length
         self.setBaseline(baseline)
 
         # make sure the line shows up at the beginning by seeding it with a geometry
-        if start_y > baseline:
-            self.setGeometry(0,0,0,0)
-        else:
-            self.setGeometry(parent_width, parent_height, 0, 0)
+        # if init_length < 0:
+        #     self.setGeometry(0,0,0,0)
+        # else:
+        #     self.setGeometry(parent_width, parent_height, 0, 0)
+
+        self.setGeometry(start_x, start_y, 0, init_length)
 
         # Movement params
         self.line_locked = True
@@ -87,6 +95,12 @@ class VLine(QFrame):
     
     def setBaseline(self, baseline):
         self.baseline_position = baseline
+
+    def unlock_line_movement(self):
+        self.line_locked = False
+
+    def lock_line_movement(self):
+        self.line_locked = True
 
     def mousePressEvent(self, event:QMouseEvent):
         """Overwrites the default mouse click callback. Every time we click the mouse, record the position"""
@@ -122,23 +136,25 @@ if __name__ == "__main__":
     widget = QWidget()
     widget.setGeometry(0, 0, 500, 500)
 
-    hrz_lines = button_locs["button 1"]["hlines"]
-    vrt_lines = button_locs["button 1"]["vlines"]
+    mybutton = "button 3"
+
+    # hrz_lines = button_locs["Buttons"][mybutton]["hlines"]
+    vrt_lines = button_locs["Buttons"][mybutton]["vlines"]
 
     ducklings = []
-    for baseline, thickness in zip(vrt_lines["baselines"], vrt_lines["thicknesses"]):
-        line = VLine(widget, button_locs["button 1"]["y"], baseline, thickness)
+    for length, thickness in zip(vrt_lines["lengths"], vrt_lines["thicknesses"]):
+        line = VLine(widget, button_locs["Buttons"][mybutton]["x"], button_locs["Buttons"][mybutton]["y"], length, thickness)
         ducklings.append(line)
 
-    for baseline, thickness in zip(hrz_lines["baselines"], hrz_lines["thicknesses"]):
-        line = HLine(widget, button_locs["button 1"]["x"], baseline, thickness)
-        ducklings.append(line)
+    # for length, thickness in zip(hrz_lines["lengths"], hrz_lines["thicknesses"]):
+    #     line = HLine(widget, button_locs["Buttons"][mybutton]["x"], length, thickness)
+    #     ducklings.append(line)
 
     print(widget.geometry().size()) 
 
     button = CircleButton(50, 
                           widget, 
-                          start_pos=(button_locs["button 1"]["x"], button_locs["button 1"]["y"]),
+                          start_pos=(button_locs["Buttons"][mybutton]["x"], button_locs["Buttons"][mybutton]["y"]),
                           ducklings=ducklings, 
                           locked=False)
     

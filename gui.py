@@ -114,7 +114,10 @@ class ApplicationWindow(QWidget):
         
         # Pneumatic grid variables
         with open("config/button_locs.yaml", "r") as stream:
-            self.button_locs = yaml.safe_load(stream)
+            pneumatic_grid_layout = yaml.safe_load(stream)
+        self.button_locs = pneumatic_grid_layout["Buttons"]
+        self.grid_lines = pneumatic_grid_layout["Lines"]
+
         self.buttons_locked = True
         self.num_buttons = len(self.button_locs)
         self.pneumatic_grid_buttons = []
@@ -828,29 +831,43 @@ class ApplicationWindow(QWidget):
         for i in range(1, self.num_buttons+1):
             # First, see if we've specified either horizontal or vertical lines, catching the 
             #   error that would pop up if we haven't entered either of these dict keys
+            # Then, if they exist, add each horizontal/vertical to the "ducklings" list
+            ducklings = []
             try:
-                hrz_lines = self.button_locs[f"button {i}"]["hlines"]
+                hrz_lines = self.button_locs[f"button {i}"]["hlines"] 
+            except KeyError as e:
+                hrz_lines = {}
+            else:
+                # Compile the horizontal lines and add to "ducklings"
+                try:
+                    for length, thickness in zip(hrz_lines["lengths"], hrz_lines["thicknesses"]):
+                        line = HLine(parent_widget, 
+                                     self.button_locs[f"button {i}"]["x"], 
+                                     self.button_locs[f"button {i}"]["y"],
+                                     length, 
+                                     thickness)
+                        line.lower()
+                        ducklings.append(line)
+                except (TypeError, KeyError):
+                    pass
+            try:
                 vrt_lines = self.button_locs[f"button {i}"]["vlines"]
             except KeyError:
-                hrz_lines = []
-                vrt_lines = []
-            ducklings = []
+                vrt_lines = {}
             # Compile the vertical lines and add to "ducklings"
-            try:
-                for baseline, thickness in zip(vrt_lines["baselines"], vrt_lines["thicknesses"]):
-                    line = VLine(parent_widget, self.button_locs[f"button {i}"]["y"], baseline, thickness)
-                    line.lower()
-                    ducklings.append(line)
-            except TypeError:
-                pass
-            # Compile the horizontal lines and add to "ducklings"
-            try:
-                for baseline, thickness in zip(hrz_lines["baselines"], hrz_lines["thicknesses"]):
-                    line = HLine(parent_widget, self.button_locs[f"button {i}"]["x"], baseline, thickness)
-                    line.lower()
-                    ducklings.append(line)
-            except TypeError:
-                pass
+            else:
+                try:
+                    for length, thickness in zip(vrt_lines["lengths"], vrt_lines["thicknesses"]):
+                        line = VLine(parent_widget, 
+                                     self.button_locs[f"button {i}"]["x"], 
+                                     self.button_locs[f"button {i}"]["y"], 
+                                     length, 
+                                     thickness)
+                        line.lower()
+                        ducklings.append(line)
+                except (TypeError, KeyError):
+                    pass
+            
             # Finally, create the button at the specified position and assign it ducklings 
             #   and a callback function
             start_pos = (self.button_locs[f"button {i}"]["x"], self.button_locs[f"button {i}"]["y"])
@@ -860,8 +877,17 @@ class ApplicationWindow(QWidget):
             self.pneumatic_grid_buttons.append(button)
             button.clicked.connect(partial(self._on_push_pneumatic_button, button))
 
+        self.draw_pneumatic_grid_lines(parent_widget)
+
         return parent_widget
     
+    def draw_pneumatic_grid_lines(self, parent_widget:QWidget):
+        vlines = self.grid_lines["vlines"]
+        for x, y, length, thickness in zip(vlines["starts"]["x"], vlines["starts"]["y"], vlines["lengths"], vlines["thicknesses"]):
+            line = VLine(parent_widget, x, y, length, thickness)
+            line.lower()
+    
+
     def _on_edit_pneumatic_buttons(self):
 
         # Needs to be a class variable otherwise it goes out of scope        
