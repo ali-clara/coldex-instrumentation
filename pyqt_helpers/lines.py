@@ -24,13 +24,38 @@ class HLine(QFrame):
             baseline = int(parent_width / 2)
         self.setBaseline(baseline)
 
+        # Movement params
+        self.line_locked = True
+        self._mouse_press_pos = None
+        self._mouse_move_pos = None
+
     def baseline(self):
         return self.baseline_position
     
     def setBaseline(self, baseline):
         self.baseline_position = baseline
-    
 
+    def mousePressEvent(self, event:QMouseEvent):
+        """Overwrites the default mouse click callback. Every time we click the mouse, record the position"""
+        self._mouse_press_pos = event.globalPos()
+        self._mouse_move_pos = event.globalPos()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event:QMouseEvent):
+        """Overwrites the QPushButton mouseMoveEvent method. Records the position of the mouse movement, finds the difference
+        between that position and the button, and moves the button
+        """
+        # If we're allowing the line to move...
+        if self.line_locked == False:
+            # Adjust offset from clicked point to origin of widget
+            currPos = self.mapToGlobal(self.pos())
+            globalPos = event.globalPos()
+            diff = globalPos - self._mouse_move_pos
+            newPos = self.mapFromGlobal(currPos + diff)
+            # Move and record
+            super().move(newPos)
+            self._mouse_move_pos = globalPos
+    
 class VLine(QFrame):
     """A vertical line"""
     def __init__(self, parent, start_y=0, baseline=None, thickness=20):
@@ -51,12 +76,38 @@ class VLine(QFrame):
             self.setGeometry(0,0,0,0)
         else:
             self.setGeometry(parent_width, parent_height, 0, 0)
+
+        # Movement params
+        self.line_locked = True
+        self._mouse_press_pos = None
+        self._mouse_move_pos = None
     
     def baseline(self):
         return self.baseline_position
     
     def setBaseline(self, baseline):
         self.baseline_position = baseline
+
+    def mousePressEvent(self, event:QMouseEvent):
+        """Overwrites the default mouse click callback. Every time we click the mouse, record the position"""
+        self._mouse_press_pos = event.globalPos()
+        self._mouse_move_pos = event.globalPos()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event:QMouseEvent):
+        """Overwrites the QPushButton mouseMoveEvent method. Records the position of the mouse movement, finds the difference
+        between that position and the button, and moves the button
+        """
+        # If we're allowing the line to move...
+        if self.line_locked == False:
+            # Adjust offset from clicked point to origin of widget
+            currPos = self.mapToGlobal(self.pos())
+            globalPos = event.globalPos()
+            diff = globalPos - self._mouse_move_pos
+            newPos = self.mapFromGlobal(currPos + diff)
+            # Move and record
+            super().move(newPos)
+            self._mouse_move_pos = globalPos
     
         
 if __name__ == "__main__":
@@ -73,8 +124,6 @@ if __name__ == "__main__":
 
     hrz_lines = button_locs["button 1"]["hlines"]
     vrt_lines = button_locs["button 1"]["vlines"]
-
-
 
     ducklings = []
     for baseline, thickness in zip(vrt_lines["baselines"], vrt_lines["thicknesses"]):

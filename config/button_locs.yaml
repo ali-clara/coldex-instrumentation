@@ -4,7 +4,11 @@ button 1:
   y: 187
   vlines:
     baselines:
+    - 0
+    - 150
     thicknesses:
+    - 20
+    - 20
   hlines:
     baselines:
     - 0
