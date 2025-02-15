@@ -887,7 +887,6 @@ class ApplicationWindow(QWidget):
             line = VLine(parent_widget, x, y, length, thickness)
             line.lower()
     
-
     def _on_edit_pneumatic_buttons(self):
 
         # Needs to be a class variable otherwise it goes out of scope        
