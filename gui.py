@@ -823,6 +823,7 @@ class ApplicationWindow(QWidget):
         parent_widget = QWidget()
         parent_widget.setMinimumHeight(int(self.height()/2.25))
         parent_widget.setMinimumWidth(int(self.width()*0.6))
+        self.draw_pneumatic_grid_lines(parent_widget)
 
         # For each button, create our custom button object and add the specified 
         #   horizontal and vertical lines from config/button_locs.yaml. Since we 
@@ -877,15 +878,21 @@ class ApplicationWindow(QWidget):
             self.pneumatic_grid_buttons.append(button)
             button.clicked.connect(partial(self._on_push_pneumatic_button, button))
 
-        self.draw_pneumatic_grid_lines(parent_widget)
-
         return parent_widget
     
     def draw_pneumatic_grid_lines(self, parent_widget:QWidget):
         vlines = self.grid_lines["vlines"]
+        hlines = self.grid_lines["hlines"]
+        self.pneumatic_grid_lines = {"vlines": [], "hlines": []}
         for x, y, length, thickness in zip(vlines["starts"]["x"], vlines["starts"]["y"], vlines["lengths"], vlines["thicknesses"]):
             line = VLine(parent_widget, x, y, length, thickness)
             line.lower()
+            self.pneumatic_grid_lines["vlines"].append(line)
+        for x, y, length, thickness in zip(hlines["starts"]["x"], hlines["starts"]["y"], hlines["lengths"], hlines["thicknesses"]):
+            line = HLine(parent_widget, x, y, length, thickness)
+            line.lower()
+            self.pneumatic_grid_lines["hlines"].append(line)
+
     
     def _on_edit_pneumatic_buttons(self):
 
@@ -906,7 +913,7 @@ class ApplicationWindow(QWidget):
         # Find the arduino pin that corresponds to our button number
         button_num = button.text()   
         try:
-            pin = self.sensor_comms["Pneumatic valves"][f"Button {button_num}"]
+            pin = self.sensor_comms["Pneumatic valves"][f"Button {button_num}"]["digital pin"]
         except KeyError as e:
             logger.error(f"Could not find Button {button_num} in sensor_comms.yaml (Key error {e})")
             return
@@ -923,20 +930,46 @@ class ApplicationWindow(QWidget):
                 pneumatic_button.unlock_button_movement() # Unlock the buttons
                 control_button.setText("Lock Button Positions") # Change the button text to reflect the button status
                 self.buttons_locked = False # Keep track of our own internal flag
+            for line in self.pneumatic_grid_lines["vlines"]:
+                line.unlock_line_movement()
+            for line in self.pneumatic_grid_lines["hlines"]:
+                line.unlock_line_movement()
         else:
             for pneumatic_button in self.pneumatic_grid_buttons:
                 pneumatic_button.lock_button_movement()
                 control_button.setText("Unlock Button Positions")
                 self.buttons_locked = True
+            for line in self.pneumatic_grid_lines["vlines"]:
+                line.lock_line_movement()
+            for line in self.pneumatic_grid_lines["hlines"]:
+                line.lock_line_movement()
 
     def _save_pneumatic_button_positions(self):
         # button_loc_dic = {}
         for i, pneumatic_button in enumerate(self.pneumatic_grid_buttons, start=1):
             self.button_locs[f"button {i}"]["x"] = pneumatic_button.get_center()[0]
             self.button_locs[f"button {i}"]["y"] = pneumatic_button.get_center()[1]
+
+        for line_type in ["vlines", "hlines"]:
+            line_x = []
+            line_y = []
+            line_len = []
+            line_thickness = []
+            for line in self.pneumatic_grid_lines[line_type]:
+                line_x.append(line.geometry().x())
+                line_y.append(line.geometry().y())
+                line_len.append(line.length)
+                line_thickness.append(line.thickness)
+            
+            self.grid_lines[line_type]["starts"]["x"] = line_x
+            self.grid_lines[line_type]["starts"]["y"] = line_y
+            self.grid_lines[line_type]["lengths"] = line_len
+            self.grid_lines[line_type]["thicknesses"] = line_thickness
+
+        final_dict = {"Buttons": self.button_locs, "Lines": self.grid_lines}
         
         with open("config/button_locs.yaml", "w") as yaml_file:
-            yaml.dump(self.button_locs, yaml_file, sort_keys=False)
+            yaml.dump(final_dict, yaml_file, sort_keys=False)
 
     # Autonomous / manual control
     def build_pneum_ctrl_layout(self):

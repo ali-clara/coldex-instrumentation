@@ -1,34 +1,17 @@
-# Each button in "Buttons" must be given an x,y coordinate in px. The top left corner of the window is (0,0), positive Y is down,
-  # positive X is to the right. Size isn't super intuitive unfortunately.
-  # The buttons can can have the optional children "vlines" and "hlines". These are vertical and horizontal lines that will
-  #   move along with the button if the button is dragged around. Adding one or both of these to each button is optional, but if you 
-  #   add them, they MUST have an initial length and a thickness. 
-  #
-  #       "x" -> x coordinate (px) of the button. Must be an integer (no decimal points)
-  #       "y" -> y coordinate (px) of the button. Must be an integer (no decimal points)
-  #       "lengths"-> initial length (px) of each line in the reference frame of the button. Can be positive or negative.
-  #       "thicknesses" -> thickness (px) of each line. 20px by default
-
-# Each line in "Lines" will create a line at the coordinate provided and go off either horizontal or vertical the length you specify.
-#   Unlike the children of "Buttons", these lines have no masters and can be dragged around all on their own. They can only be
-#   resized here though. Sorry.
-#       "starts" -> initial (x,y) (px) of each line. Tope left corner of the window is still (0,0)
-#       "lengths" -> length of the line (px). Can be positive or negative.
-
 Buttons:
   button 1:
-    x: 45
-    y: 187
+    x: 32
+    y: 195
     hlines:
-      lengths: 
+      lengths:
       - -45
       - 70
       thicknesses:
       - 20
       - 20
   button 2:
-    x: 137
-    y: 186
+    x: 125
+    y: 195
     hlines:
       lengths:
       - -105
@@ -37,170 +20,170 @@ Buttons:
       - 20
       - 20
   button 3:
-    x: 209
-    y: 51
+    x: 229
+    y: 47
     vlines:
       lengths:
       - -51
-      - 82
+      - 60
       thicknesses:
       - 20
       - 20
   button 4:
-    x: 308
-    y: 50
+    x: 317
+    y: 48
     vlines:
       lengths:
       - -50
-      - 82
+      - 60
       thicknesses:
       - 20
       - 20
   button 5:
-    x: 402
-    y: 51
+    x: 409
+    y: 49
     vlines:
       lengths:
       - -50
-      - 82
+      - 60
       thicknesses:
       - 20
       - 20
   button 6:
-    x: 208
-    y: 350
+    x: 222
+    y: 344
     vlines:
       lengths:
-      - -83
+      - -60
       - 57
       thicknesses:
       - 20
       - 20
   button 7:
-    x: 302
-    y: 349
+    x: 310
+    y: 344
     vlines:
       lengths:
-      - -83
+      - -60
       - 57
       thicknesses:
       - 20
       - 20
   button 8:
-    x: 402
-    y: 347
+    x: 401
+    y: 344
     vlines:
       lengths:
-      - -83
+      - -60
       - 57
       thicknesses:
       - 20
       - 20
   button 9:
-    x: 490
-    y: 171
+    x: 480
+    y: 157
     vlines:
       lengths:
-      - -38
+      - -50
       - 43
       thicknesses:
       - 20
       - 20
   button 10:
-    x: 490
-    y: 232
+    x: 480
+    y: 237
     vlines:
       lengths:
-      - -20
-      - 45
+      - -50
+      - 55
       thicknesses:
       - 20
       - 20
   button 11:
-    x: 602
-    y: 93
+    x: 594
+    y: 85
     vlines:
       lengths:
       - 111
       thicknesses:
       - 20
   button 12:
-    x: 704
-    y: 93
+    x: 696
+    y: 85
     vlines:
       lengths:
       - 111
       thicknesses:
       - 20
   button 13:
-    x: 808
-    y: 96
+    x: 800
+    y: 88
     vlines:
       lengths:
       - 111
       thicknesses:
       - 20
   button 14:
-    x: 880
-    y: 224
+    x: 870
+    y: 238
     vlines:
       lengths:
-      - -10
+      - -35
       - 60
       thicknesses:
       - 20
       - 20
   button 15:
-    x: 639
-    y: 410
+    x: 631
+    y: 402
     vlines:
       lengths:
       - -126
       thicknesses:
       - 20
   button 16:
-    x: 719
-    y: 410
+    x: 711
+    y: 402
     vlines:
       lengths:
       - -126
       thicknesses:
       - 20
   button 17:
-    x: 799
-    y: 410
+    x: 791
+    y: 402
     vlines:
       lengths:
       - -126
       thicknesses:
       - 20
   button 18:
-    x: 880
-    y: 410
+    x: 871
+    y: 403
     vlines:
       lengths:
       - -126
       thicknesses:
       - 20
   button 19:
-    x: 952
-    y: 410
+    x: 944
+    y: 402
     vlines:
       lengths:
       - -126
       thicknesses:
       - 20
   button 20:
-    x: 1028
-    y: 410
+    x: 1020
+    y: 402
     vlines:
       lengths:
       - -126
       thicknesses:
       - 20
   button 21:
-    x: 1105
-    y: 410
+    x: 1097
+    y: 402
     vlines:
       lengths:
       - -126
@@ -210,15 +193,32 @@ Lines:
   vlines:
     starts:
       x:
-      - 170
+      - 186
       y:
-      - 133
+      - 100
     lengths:
-    - 134
+    - 200
     thicknesses:
     - 20
   hlines:
     starts:
-    - 
+      x:
+      - 192
+      - 192
+      - 471
+      - 632
+      y:
+      - 100
+      - 280
+      - 185
+      - 276
     lengths:
+    - 300
+    - 300
+    - 410
+    - 476
     thicknesses:
+    - 20
+    - 20
+    - 20
+    - 20

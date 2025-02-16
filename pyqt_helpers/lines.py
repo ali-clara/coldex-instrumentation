@@ -9,7 +9,7 @@ class HLine(QFrame):
         self.setMinimumHeight(thickness)
         self.setMidLineWidth(thickness)
         self.setFrameShape(QFrame.HLine)
-        self.setFrameShadow(QFrame.Raised)
+        self.setFrameShadow(QFrame.Sunken)
 
         parent_width = self.parentWidget().geometry().width()
         parent_height = self.parentWidget().geometry().height()
@@ -23,6 +23,9 @@ class HLine(QFrame):
 
         baseline = start_x + init_length
         self.setBaseline(baseline)
+
+        self.thickness = thickness
+        self.length = init_length
 
         # Movement params
         self.line_locked = True
@@ -69,13 +72,17 @@ class VLine(QFrame):
         self.setMinimumWidth(thickness)
         self.setMidLineWidth(thickness)
         self.setFrameShape(QFrame.VLine)
-        self.setFrameShadow(QFrame.Raised)
+        self.setFrameShadow(QFrame.Sunken)
+
         
         parent_height = self.parentWidget().geometry().height()
         parent_width = self.parentWidget().geometry().width()
 
         baseline = start_y + init_length
         self.setBaseline(baseline)
+
+        self.thickness = thickness
+        self.length = init_length
 
         # make sure the line shows up at the beginning by seeding it with a geometry
         # if init_length < 0:
