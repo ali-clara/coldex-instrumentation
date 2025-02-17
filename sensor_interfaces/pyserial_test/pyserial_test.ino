@@ -3,6 +3,11 @@ const byte numChars = 32; // expected maximum input length: 32 bits
 char receivedChars[numChars];   // an array to store the received data
 boolean newData = false;  // flag to keep track of if we have new data to process or not
 
+// char cmd[2];
+// char mypin[2];
+// int pin_pos = 0;
+// int cmd_pos = 0;
+
 // Define input options - the serial message will come in from Pyserial as an integer, but that's not
 // very human-readable
 #define one_thing 1
@@ -10,14 +15,14 @@ boolean newData = false;  // flag to keep track of if we have new data to proces
 
 #define pinLow 00
 #define pinHigh 01
-char delimiter = ";"
+const char delimiter = ';';
 
 // Make sure the serial is set up
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   while (!Serial); // Wait out until serial starts up
-  clearInputBuffer();
   delay(100);
+  Serial.println("Ready to recieve serial commands");
 }
 
 // Then loop forever reading serial input
@@ -70,56 +75,85 @@ void recvWithStartEndMarker() {
 
 // Function to process serial input
 void parseCommands() {
-  int c = 0;
-  int c_idx = 0;
-  int t_idx = 0;
-  char temp[32];
-
-  // If we have new data to process
+  // If we have new data, process it
   if (newData == true) {
-    // Convert serial monitor value to int and cast as float
-    // int len = strlen(receivedChars);
-    // c = (float) atoi(receivedChars);
+    // Create null arrays to sort out the pin and command values from the serial input
+    char cmd[2] = {'\0', '\0'};
+    char mypin[2] = {'\0', '\0'};
+    // Create indices for those arrays
+    int cIdx = 0;
+    int pIdx = 0;
+    // Create a flag to see if we've hit the delimieter
+    boolean hitDel = false;
+    // Loop through the received input array, splitting it into the command (before delimiter) and
+    // pin (after delimiter) segements
+    for (int i=0; i<strlen(receivedChars); i++){
+      // Grab the next index of our received input array
+      char c = receivedChars[i];
+      // If we hit the delimieter, change our flag and skip the rest of that loop
+      if (c == delimiter){
+        hitDel = true;
+        continue;
+      }
+      // Update either the pin or command arrays accordingly
+      if (hitDel == true){
+        mypin[pIdx] = c;
+        pIdx ++;
+      }
+      else{
+        cmd[cIdx] = c;
+        cIdx ++;
+      }
+    }
 
     // Reset the new data flag
     newData = false;
 
-    // I THINK this splits the input into substrings depending on delimiter, but will need to 
-    // test it when actually plugged into an arduino
-    char * p_substring;
-    // printf ("Splitting string \"%s\" into tokens:\n",receivedChars);
-    p_substring = strtok(receivedChars, delimiter);
-    int command = strlen(p_substring[0])
-    int command_input = strlen(p_substring[1])
+    // Convert the input to ints
+    int cmdResult = atoi(cmd);
+    int pinResult = atoi(mypin);
 
-    // Loop through pch
-    // while (p_substring != NULL)
-    // {
-    //   printf("%s\n",p_substring);
-    //   p_substring = strtok(NULL, " ,.-");
-    // }
-
+    // // Sanity check for debugging - did we get the expected values?
+    // Serial.print("command ");
+    // Serial.println(cmdResult);
+    // Serial.print("pin ");
+    // Serial.println(pinResult);
+    
     // Manage the serial input accordingly
-    if (c == pinLow){
-      setPinLow(command_input);
-    }
-    else if (c == pinHigh){
-      setPinHigh(command_input);
+    if (pinResult <= 69){
+      if (cmdResult == pinLow){
+        setPinLow(pinResult);
+      }
+      else if (cmdResult == pinHigh){
+        setPinHigh(pinResult);
+      }
+      else{
+        Serial.println("Unknown command received");
+      }
     }
     else{
-      Serial.println("Unknown input received");
+      Serial.println("Invalid pin received");
     }
   }
+
 }
 
 void setPinLow(int pin){
-  Serial.println("Setting pin low");
-  digitalWrite(pin, LOW)
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, LOW);
+  Serial.print("Pin ");
+  Serial.print(pin);
+  Serial.print(" set ");
+  Serial.println(digitalRead(pin));
 }
 
 void setPinHigh(int pin){
-  Serial.println("Setting pin high");
-  digitalWrite(pin, HIGH)
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, HIGH);
+  Serial.print("Pin ");
+  Serial.print(pin);
+  Serial.print(" set ");
+  Serial.println(digitalRead(pin));
 }
 
 void clearInputBuffer() {
