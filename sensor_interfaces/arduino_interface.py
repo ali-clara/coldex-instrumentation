@@ -41,6 +41,7 @@ class ArduinoInterface():
         try:
             self.ser = serial.Serial(port, baud, timeout=1)
             logger.info(f"Connected to serial port {port} with baud {baud}")
+            self.query()
         except SerialException:
             logger.warning(f"Could not connect to serial port {port}")
 
@@ -78,7 +79,8 @@ class ArduinoInterface():
     @log_on_start(logging.INFO, "Querying arduino", logger=logger)
     def query(self):
         get_data = self.ser.readline()
-        data_string = get_data.decode('utf-8')
+        # data_string = get_data.decode('utf-8')
+        data_string = get_data
 
         logger.info(f"Result from querying arduino: {data_string}")
 
@@ -91,9 +93,10 @@ class ArduinoInterface():
         command_valid = self.validate_command(command)
         if command_valid:
             msg_str = self.start_character+command+self.end_character
+            logger.debug(f"Sending command to Arduino: {msg_str}")
             self.ser.write(str(msg_str).encode())
             self.query()
-            logger.debug(f"Sent command to Arduino: {command}")
+            
         else:
             logger.debug(f"Invalid Arduino command: {command}")
 
@@ -119,13 +122,13 @@ class ArduinoInterface():
     def set_pin_high(self, pin):
         pin = self.validate_and_format_pin(pin)
         if pin:
-            logger.info(f"Setting pin {pin} high")
+            # logger.info(f"Setting pin {pin} high")
             msg_str = "01;"+pin
             self.send_command(msg_str)
 
     def set_pin_low(self, pin):
         pin = self.validate_and_format_pin(pin)
         if pin:
-            logger.info(f"Setting pin {pin} low")
+            # logger.info(f"Setting pin {pin} low")
             msg_str = "00;"+pin
             self.send_command(msg_str)

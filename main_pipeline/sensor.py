@@ -100,7 +100,6 @@ class Sensor():
         """
 
         # Fill in the dictionary with the results of calling the sensor init functions
-        self.sensor_status_dict.update({"Arduino": self.arduino.initialize_arduino()})
         self.sensor_status_dict.update({"Dummy sensor": 0})
 
         return self.sensor_status_dict
@@ -116,7 +115,13 @@ class Sensor():
         Returns - status of each sensor
         """
         # Updates the status dictionary with the results of shutting down the sensors
-        self.sensor_status_dict.update({"Arduino": self.arduino.shutdown_arduino()})
         self.sensor_status_dict.update({"Dummy sensor": 0})
 
         return self.sensor_status_dict
+
+    def close_arduino_serial(self):
+        self.arduino.ser.close()
+
+    def open_arduino_serial(self):
+        self.arduino.initialize_pyserial(port=comms_config["Arduino"]["serial port"], 
+                                        baud=comms_config["Arduino"]["baud rate"])

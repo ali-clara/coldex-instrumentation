@@ -15,7 +15,7 @@ import time
 import logging
 import yaml
 
-from main_pipeline.sensor import Sensor
+from sensor_interfaces.arduino_interface import ArduinoInterface
 
 class TestRoutine:
     def __init__(self, **kwargs):
@@ -35,12 +35,16 @@ class TestRoutine:
             fh.setLevel(logging.DEBUG)
             self.logger.addHandler(fh)
 
-        # Set up our instance of the arduino. If we've passed in an arduino object, use that. Otherwise, set up our own
+        # Set up our instance of the arduino.
         try:
-            self.arduino = kwargs["arduino"]
-        except KeyError:
-            sensor = Sensor()
-            self.arduino = sensor.arduino
+            with open("config/sensor_comms.yaml", 'r') as stream:
+                comms_config = yaml.safe_load(stream)
+        except FileNotFoundError as e:
+            self.logger.error(f"Error in loading the sensor_comms configuration file: {e} Check your file storage and directories")
+        
+        self.arduino = ArduinoInterface(serial_port=comms_config["Arduino"]["serial port"], 
+                                        baud_rate=comms_config["Arduino"]["baud rate"])
+        
 
         # Read in the Arduino pin configuration set up in our yaml
         with open("config/sensor_comms.yaml", "r") as stream:

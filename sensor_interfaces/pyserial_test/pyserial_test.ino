@@ -3,25 +3,18 @@ const byte numChars = 32; // expected maximum input length: 32 bits
 char receivedChars[numChars];   // an array to store the received data
 boolean newData = false;  // flag to keep track of if we have new data to process or not
 
-// char cmd[2];
-// char mypin[2];
-// int pin_pos = 0;
-// int cmd_pos = 0;
-
 // Define input options - the serial message will come in from Pyserial as an integer, but that's not
 // very human-readable
-#define one_thing 1
-#define another_thing 2
-
 #define pinLow 00
 #define pinHigh 01
 const char delimiter = ';';
 
 // Make sure the serial is set up
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(19200);
   while (!Serial); // Wait out until serial starts up
   delay(100);
+  clearInputBuffer();
   Serial.println("Ready to recieve serial commands");
 }
 
@@ -154,6 +147,8 @@ void setPinHigh(int pin){
   Serial.print(pin);
   Serial.print(" set ");
   Serial.println(digitalRead(pin));
+
+  // Serial.write(digitalRead(pin));
 }
 
 void clearInputBuffer() {

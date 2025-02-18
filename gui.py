@@ -357,8 +357,8 @@ class ApplicationWindow(QWidget):
             status.setText("OFFLINE")
             status.setFont(self.norm12)
             status.setStyleSheet("background-color:#AF5189; margin:10px")
-            status.setAlignment(Qt.AlignCenter)
-            parent.addWidget(status, row, 0, 1, colspan)
+            status.setAlignment(Qt.AlignHCenter)
+            parent.addWidget(status, row, 0, 1, colspan, alignment=Qt.AlignTop)
             row +=1
             self.instrument_status_display.update({sensor:status}) # Hold onto the status display for later
             # Third widget - sensor buttons (initialize, shutdown, start, etc)
@@ -385,7 +385,7 @@ class ApplicationWindow(QWidget):
                 row +=1
             # Otherwise, catch the error and move on
             except KeyError:
-                logger.info(f"No command buttons for the {sensor}")
+                logger.debug(f"No command buttons for the {sensor}")
             # Fourth widget - control input. This is a button that sends the input (the callback function lives in 
                 # input_buttons) and a line entry that lets the user set the input
                 # Validation for the inputs happens in the lowest level sensor interface, so it's safe to chuck any
@@ -412,7 +412,7 @@ class ApplicationWindow(QWidget):
                     parent.addWidget(line, row, 1)
                     row +=1
             except KeyError:
-                logger.info(f"No control inputs for the {sensor}")
+                logger.debug(f"No control inputs for the {sensor}")
             # Fifth widget - dividing line
             line = QFrame(self)
             line.setFrameShape(QFrame.HLine)
@@ -918,7 +918,7 @@ class ApplicationWindow(QWidget):
             logger.error(f"Could not find Button {button_num} in sensor_comms.yaml (Key error {e})")
             return
         # Send the arduino signal accordingly
-        logger.info(f"Button {button_num} set to {button.get_state()}")
+        logger.info(f"Valve {button_num} set to {button.get_state()}")
         if button.is_open():
             self.sensor.arduino.set_pin_high(pin)
         else:
@@ -1039,6 +1039,7 @@ class ApplicationWindow(QWidget):
                 pneumatic_button.setDisabled(True)
             for _, control in self.pneumatic_autonomous_controls.items():
                 control.setEnabled(True)
+            self.sensor.close_arduino_serial()
         # If button is unchecked, lock out autonomous controls
         else:
             button.setText("Enable Autonomous Valve Control")
@@ -1046,6 +1047,7 @@ class ApplicationWindow(QWidget):
                 pneumatic_button.setEnabled(True)
             for _, control in self.pneumatic_autonomous_controls.items():
                 control.setDisabled(True)
+            self.sensor.open_arduino_serial()
 
     def _on_start_autonomous(self, routine_select:QComboBox):
         routine_name = routine_select.currentText()
@@ -1059,7 +1061,9 @@ class ApplicationWindow(QWidget):
             pid = os.getpid()
             arduino = self.sensor.arduino
             self.multiprocess = multiprocessing.Process(target=self.auto_routine_dict[routine_name].run,
-                                            kwargs={"logger": logger, "arduino": arduino})
+                                            # kwargs={"logger": logger, "arduino": arduino}
+                                            kwargs={"logger": logger}
+                                            )
             self.multiprocess.start()
             self.p = psutil.Process(self.multiprocess.pid)
         # we have started - self.p does exist
@@ -1155,6 +1159,7 @@ class ApplicationWindow(QWidget):
         # Create some object variables to hold plotting information - the QTabWidget that displays the figs, and a dictionary
         # to hold onto the figure objects themselves for later updating
         self.plot_tab = QTabWidget(self)
+        self.plot_tab.setMinimumHeight(int(self.height()/2.25))
         self.plot_figs = {}
         # Loop through the sensors, create a figure & toolbar for each, and add them to the QTabWidget
         for sensor in self.sensor_names:
@@ -1176,6 +1181,7 @@ class ApplicationWindow(QWidget):
             # Create a button to plot the entire day of data in a separate window
             button = QPushButton("Plot Entire Day")
             button.setFont(self.norm12)
+            button.setEnabled(False)
             button.pressed.connect(partial(self.plot_entire_day, sensor))
             button.setMaximumHeight(50)
             # Add the figure, toolbar, and button to this tab's layout
