@@ -23,13 +23,19 @@ fh.setFormatter(formatter)
 class ArduinoInterface():
 
     def __init__(self, serial_port, baud_rate, custom_logger=None):
+        
+        if custom_logger is not None:
+            self.logger = custom_logger
+        else:
+            self.logger = logger
+        
         self.initialize_pyserial(serial_port, baud_rate)
 
         # Different serial command characters
         self.start_character = "<"
         self.end_character = ">"
-        self.one_thing = "1"
-        self.another_thing = "2"
+        # self.one_thing = "1"
+        # self.another_thing = "2"
 
     def initialize_pyserial(self, port, baud):
         """
@@ -41,7 +47,10 @@ class ArduinoInterface():
         try:
             self.ser = serial.Serial(port, baud, timeout=1)
             logger.info(f"Connected to serial port {port} with baud {baud}")
-            self.query()
+            self.ser.flush()
+            self.ser.reset_input_buffer()
+            self.ser.readline()
+            self.ser.readline()
         except SerialException:
             logger.warning(f"Could not connect to serial port {port}")
 
@@ -79,10 +88,10 @@ class ArduinoInterface():
     @log_on_start(logging.INFO, "Querying arduino", logger=logger)
     def query(self):
         get_data = self.ser.readline()
-        # data_string = get_data.decode('utf-8')
-        data_string = get_data
+        data_string = get_data.decode('utf-8')
+        # data_string = get_data
 
-        logger.info(f"Result from querying arduino: {data_string}")
+        self.logger.info(f"Result from querying arduino: {data_string}")
 
         return data_string
     
@@ -132,3 +141,7 @@ class ArduinoInterface():
             # logger.info(f"Setting pin {pin} low")
             msg_str = "00;"+pin
             self.send_command(msg_str)
+
+
+if __name__ == "__main__":
+    myarduino = ArduinoInterface("COM4", 19200)

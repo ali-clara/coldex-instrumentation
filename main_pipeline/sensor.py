@@ -84,7 +84,7 @@ class Sensor():
 
         self.arduino = ArduinoInterface(serial_port=comms_config["Arduino"]["serial port"], 
                                         baud_rate=comms_config["Arduino"]["baud rate"],
-                                        custom_logger=self.logger)
+                                        custom_logger=custom_logger)
 
     def __del__(self):
         self.shutdown_sensors()

@@ -83,6 +83,8 @@ class ApplicationWindow(QWidget):
         self.norm12 = QFont("Helvetica", 12)
         self.norm10 = QFont("Helvetica", 10)
 
+        self.logger = logger
+
         status_layout = self.build_status_layout()
 
         # Initialize the main sense-interpret-save data pipeline
@@ -1121,16 +1123,16 @@ class ApplicationWindow(QWidget):
         # list_widget.setMaximumHeight(int(pneum_widget.height()*0.75))
 
         handler = GUIHandler(list_widget, level=logging.DEBUG)
-        logger.addHandler(handler)
+        self.logger.addHandler(handler)
         formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(name)s:  %(message)s", datefmt="%H:%M:%S")
         handler.setFormatter(formatter)
         self.GUI_log_handler = handler
 
-        logger.info("Getting logger {0} - {1}".format(id(logger), logger.handlers))
-        logger.debug("This is normal text")
-        logger.warning("Watch out")
-        logger.error("Something has gone wrong")
-        logger.critical("Oh god everything is broken")
+        self.logger.info("Getting logger {0} - {1}".format(id(logger), logger.handlers))
+        self.logger.debug("This is normal text")
+        self.logger.warning("Watch out")
+        self.logger.error("Something has gone wrong")
+        self.logger.critical("Oh god everything is broken")
 
         status_panel.addWidget(list_widget, alignment=Qt.AlignTop)
 

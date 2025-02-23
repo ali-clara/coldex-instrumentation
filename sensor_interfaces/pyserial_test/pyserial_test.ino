@@ -8,6 +8,9 @@ boolean newData = false;  // flag to keep track of if we have new data to proces
 #define pinLow 00
 #define pinHigh 01
 const char delimiter = ';';
+// Create arrays to sort out the pin and command values from the serial input
+char cmd[3];
+char mypin[3];
 
 // Make sure the serial is set up
 void setup() {
@@ -70,10 +73,9 @@ void recvWithStartEndMarker() {
 void parseCommands() {
   // If we have new data, process it
   if (newData == true) {
-    // Create null arrays to sort out the pin and command values from the serial input
-    char cmd[2] = {'\0', '\0'};
-    char mypin[2] = {'\0', '\0'};
-    // Create indices for those arrays
+    // Reset the new data flag
+    newData = false;
+    // Create indices for our command and pin arrays
     int cIdx = 0;
     int pIdx = 0;
     // Create a flag to see if we've hit the delimieter
@@ -98,19 +100,19 @@ void parseCommands() {
         cIdx ++;
       }
     }
-
-    // Reset the new data flag
-    newData = false;
+    // Terminate the arrays properly
+    cmd[cIdx] = '\0';
+    mypin[pIdx] = '\0';
 
     // Convert the input to ints
     int cmdResult = atoi(cmd);
     int pinResult = atoi(mypin);
 
-    // // Sanity check for debugging - did we get the expected values?
+    // Sanity check for debugging - did we get the expected values?
     // Serial.print("command ");
-    // Serial.println(cmdResult);
+    // Serial.println(cmd);
     // Serial.print("pin ");
-    // Serial.println(pinResult);
+    // Serial.println(mypin);
     
     // Manage the serial input accordingly
     if (pinResult <= 69){
@@ -147,8 +149,6 @@ void setPinHigh(int pin){
   Serial.print(pin);
   Serial.print(" set ");
   Serial.println(digitalRead(pin));
-
-  // Serial.write(digitalRead(pin));
 }
 
 void clearInputBuffer() {
